@@ -1,0 +1,9 @@
+import { useEffect, useState } from "react";
+import { api } from "../../api";
+
+export default function AgentIssueReports() {
+  const [issues,setIssues]=useState([]); const [error,setError]=useState("");
+  const load=async()=>{try{setIssues(await api.getAdminAgentIssues())}catch(e){setError(e.message)}}; useEffect(()=>{load()},[]);
+  const review=async(id,decision)=>{try{await api.reviewAdminAgentIssue(id,{decision,admin_notes:decision==="APPROVE"?"Issue validated by Admin.":"Issue not sufficiently validated."});await load()}catch(e){setError(e.message)}};
+  return <div><div className="mb-6"><p className="text-[13px] font-medium text-[#087A32]">Governance</p><h2 className="text-[28px] font-semibold text-[#102A43] mt-1">Agent Issue Reports</h2><p className="text-[14px] text-[#52606D] mt-1">Validate Medical Supervisor reports before changing an agent's active status.</p></div>{error&&<div className="mb-4 text-[13px] text-[#C62828]">{error}</div>}<div className="space-y-4">{issues.map(i=><div key={i.id} className="bg-white border border-[#E3E9E5] rounded-2xl p-5"><div className="flex justify-between gap-4"><div><h3 className="font-semibold text-[#102A43]">{i.agent_name}</h3><p className="text-[12px] text-[#7B8794] mt-1">{i.issue_type} • {i.severity} • {i.status}</p><p className="text-[13px] text-[#52606D] mt-3">{i.description}</p>{i.evidence&&<p className="text-[12px] text-[#7B8794] mt-2">Evidence: {i.evidence}</p>}</div>{i.status==="PENDING_ADMIN_REVIEW"&&<div className="flex gap-2 h-fit"><button onClick={()=>review(i.id,"APPROVE")} className="rounded-xl bg-[#087A32] text-white px-4 py-2 text-[12px] font-semibold">Validate & Deactivate</button><button onClick={()=>review(i.id,"DISMISS")} className="rounded-xl border border-[#D9E2DC] px-4 py-2 text-[12px] font-semibold text-[#52606D]">Dismiss</button></div>}</div></div>)}{!issues.length&&<div className="text-[13px] text-[#7B8794]">No agent issue reports.</div>}</div></div>
+}
