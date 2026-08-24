@@ -384,6 +384,7 @@ DEMO_TALUKS = {
     "Madikeri",
     "Somwarpet",
     "Virajpet",
+    "Kushalnagar",
     "Mysuru",
     "Hunsur",
     "Nanjangud",
@@ -537,6 +538,21 @@ def seed():
             taluks_by_name["Hunsur"],
         )
 
+        # Kushalnagar is connected to the Kodagu surveillance
+        # network so neighbouring disease activity can influence
+        # its predictions.
+        add_adjacency(
+            db,
+            taluks_by_name["Madikeri"],
+            taluks_by_name["Kushalnagar"],
+        )
+
+        add_adjacency(
+            db,
+            taluks_by_name["Somwarpet"],
+            taluks_by_name["Kushalnagar"],
+        )
+
         add_adjacency(
             db,
             taluks_by_name["Hunsur"],
@@ -610,6 +626,9 @@ def seed():
 
             "Somwarpet":
                 "Suresh Nanjappa",
+
+            "Kushalnagar":
+                "Kushalnagar Health Officer",
 
             "Mysuru":
                 "Lakshmi Devaraj",
@@ -690,6 +709,20 @@ def seed():
                 "Typhoid": (2, 0),
                 "Influenza": (7, -1),
                 "Chikungunya": (1, 0),
+            },
+
+            # ------------------------------------------------
+            # KUSHALNAGAR
+            #
+            # Dengue is intentionally the dominant disease
+            # for the precautionary-measures demonstration.
+            # ------------------------------------------------
+            "Kushalnagar": {
+                "Dengue": (32, +8),
+                "Malaria": (14, +3),
+                "Typhoid": (5, +1),
+                "Influenza": (9, -1),
+                "Chikungunya": (4, +1),
             },
 
             "Mysuru": {
@@ -775,6 +808,83 @@ def seed():
                         "High"
                     )
 
+                    # Disease-specific preventive guidance.
+                    if disease == "Dengue":
+
+                        preventive_measures = (
+                            "Remove standing water; "
+                            "clean water containers regularly; "
+                            "use screens and mosquito nets; "
+                            "use mosquito repellents; "
+                            "wear protective clothing; "
+                            "keep surroundings clean."
+                        )
+
+                    elif disease == "Malaria":
+
+                        preventive_measures = (
+                            "Use mosquito nets; "
+                            "use mosquito repellents; "
+                            "wear protective clothing; "
+                            "use window and door screens; "
+                            "remove standing water; "
+                            "keep surroundings clean."
+                        )
+
+                    elif disease == "Chikungunya":
+
+                        preventive_measures = (
+                            "Remove standing water; "
+                            "use screens and mosquito nets; "
+                            "use mosquito repellents; "
+                            "wear protective clothing; "
+                            "rest during the daytime when unwell; "
+                            "keep surroundings clean."
+                        )
+
+                    elif disease == "COVID-19":
+
+                        preventive_measures = (
+                            "Wear a mask when appropriate; "
+                            "maintain hand hygiene; "
+                            "maintain physical distance; "
+                            "avoid touching your face; "
+                            "stay home when unwell; "
+                            "keep vaccinations up to date."
+                        )
+
+                    elif disease == "Influenza":
+
+                        preventive_measures = (
+                            "Practice respiratory hygiene; "
+                            "maintain hand hygiene; "
+                            "wear a mask when appropriate; "
+                            "keep indoor spaces well ventilated; "
+                            "avoid touching your face; "
+                            "stay home when unwell; "
+                            "maintain a healthy lifestyle; "
+                            "keep vaccinations up to date."
+                        )
+
+                    elif disease == "Typhoid":
+
+                        preventive_measures = (
+                            "Wash hands regularly; "
+                            "drink safe water; "
+                            "eat properly prepared food; "
+                            "maintain food hygiene; "
+                            "keep surroundings clean; "
+                            "follow local health guidance."
+                        )
+
+                    else:
+
+                        preventive_measures = (
+                            "Follow verified local health "
+                            "guidance and recommended "
+                            "preventive measures."
+                        )
+
                     report = models.DiseaseReport(
 
                         taluk_id=taluk.id,
@@ -796,15 +906,7 @@ def seed():
                         ),
 
                         preventive_measures=(
-                            "Fogging and source reduction "
-                            "drives ongoing."
-                            if disease in (
-                                "Dengue",
-                                "Malaria",
-                                "Chikungunya",
-                            )
-                            else
-                            "Public health advisory issued."
+                            preventive_measures
                         ),
 
                         week_number=wk,
@@ -884,6 +986,25 @@ def seed():
 
                 taluk_id=(
                     taluks_by_name["Mysuru"].id
+                ),
+            ),
+
+            models.Notification(
+                title=(
+                    "Kushalnagar Dengue Precaution Advisory"
+                ),
+
+                message=(
+                    "Dengue activity is currently elevated "
+                    "in Kushalnagar. Residents are advised "
+                    "to remove standing water and follow "
+                    "mosquito-bite prevention measures."
+                ),
+
+                type="Awareness Campaign",
+
+                taluk_id=(
+                    taluks_by_name["Kushalnagar"].id
                 ),
             ),
         ]

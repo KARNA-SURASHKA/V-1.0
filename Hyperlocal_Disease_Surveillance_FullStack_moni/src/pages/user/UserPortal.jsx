@@ -407,7 +407,7 @@ export default function UserPortal({
           overlapping header content.
         */}
 
-        {activePage !== "dashboard" && (
+        {activePage !== "dashboard" && activePage !== "precautions" && (
 
           <header
             className="
@@ -843,65 +843,51 @@ export default function UserPortal({
 
         {activePage === "precautions" && (
 
-          <PageContainer>
+          <div className="w-full">
 
-            <div className="space-y-6">
+            {talukId ? (
 
-              <div>
+              <PrecautionarySection
 
-                <h2
-                  className="
-                    text-[30px]
-                    sm:text-[34px]
-                    font-bold
-                    text-[#13264B]
-                  "
-                >
-                  Precautionary Measures
-                </h2>
+                talukId={
+                  selectedLocation?.talukId
+                }
 
-                <p
-                  className="
-                    mt-1
-                    text-[14px]
-                    sm:text-[15px]
-                    text-[#667085]
-                  "
-                >
-                  Recommended precautionary measures for
-                  the selected location.
-                </p>
+                talukName={
+                  selectedLocation?.talukName
+                }
 
+                districtName={
+                  selectedLocation?.districtName
+                }
+
+                dashboardData={
+                  dashboardData
+                }
+
+                loading={
+                  loading
+                }
+
+                error={
+                  error
+                }
+
+                username={
+                  username
+                }
+
+              />
+
+            ) : (
+
+              <div className="p-8">
+                <NoLocationMessage />
               </div>
 
+            )}
 
-              {talukId ? (
-
-                <PrecautionarySection
-
-                  talukId={
-                    selectedLocation?.talukId
-                  }
-
-                  talukName={
-                    selectedLocation?.talukName
-                  }
-
-                  districtName={
-                    selectedLocation?.districtName
-                  }
-
-                />
-
-              ) : (
-
-                <NoLocationMessage />
-
-              )}
-
-            </div>
-
-          </PageContainer>
+          </div>
 
         )}
 
