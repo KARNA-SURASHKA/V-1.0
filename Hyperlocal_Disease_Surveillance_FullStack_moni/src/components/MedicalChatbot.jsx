@@ -1,399 +1,68 @@
 import { useEffect, useRef, useState } from "react";
+
 import {
   Bot,
+  Paperclip,
   Send,
-  User,
-  AlertTriangle,
-  Loader2,
+  ShieldCheck,
   Trash2,
+  Mic,
+  HeartPulse,
+  Stethoscope,
 } from "lucide-react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { api } from "../api";
+import { api } from "../../api";
+
+import heroRight from "../../assets/ui/medical-hero-right.png";
+import robot from "../../assets/ui/medical-robot.png";
+import doctor from "../../assets/ui/medical-doctor.png";
+import botAvatar from "../../assets/ui/medical-bot.png";
 
 
 // ============================================================
-// SUGGESTED QUESTIONS
-// ============================================================
-
-const SUGGESTED_QUESTIONS = [
-  "What are the symptoms of dengue?",
-  "How can I prevent malaria?",
-  "What are the warning signs of severe dengue?",
-  "What is the difference between dengue and chikungunya?",
-];
-
-
-// ============================================================
-// INITIAL MESSAGE
-// ============================================================
-
-const INITIAL_MESSAGE = {
-  id: "initial",
-  role: "assistant",
-  content:
-    "Hello! I'm your AI Medical Assistant. I can provide general medical information about diseases, symptoms, prevention, warning signs, and health education. I cannot diagnose conditions or prescribe medicines.",
-};
-
-
-// ============================================================
-// MARKDOWN NORMALIZER
-// ============================================================
-
-function normalizeMarkdown(content) {
-  if (typeof content !== "string") {
-    return "";
-  }
-
-  return content
-    // Convert HTML line breaks sometimes returned by the AI
-    // into normal Markdown line breaks.
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/br>/gi, "\n")
-    .trim();
-}
-
-
-// ============================================================
-// MARKDOWN RENDERER
+// MARKDOWN
 // ============================================================
 
 function MedicalMarkdown({ content }) {
-  const normalizedContent = normalizeMarkdown(content);
-
   return (
     <div
       className="
-        medical-markdown
         break-words
         text-[13px]
-        leading-6
+        leading-[1.85]
+        text-[#111315]
       "
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // ----------------------------------------------------
-          // HEADINGS
-          // ----------------------------------------------------
-
-          h1: ({ children }) => (
-            <h1
-              className="
-                mb-3
-                mt-1
-                text-[18px]
-                font-bold
-                leading-7
-                text-[#13264B]
-              "
-            >
-              {children}
-            </h1>
-          ),
-
-          h2: ({ children }) => (
-            <h2
-              className="
-                mb-2.5
-                mt-4
-                text-[16px]
-                font-bold
-                leading-6
-                text-[#13264B]
-              "
-            >
-              {children}
-            </h2>
-          ),
-
-          h3: ({ children }) => (
-            <h3
-              className="
-                mb-2
-                mt-4
-                text-[14px]
-                font-bold
-                leading-6
-                text-[#13264B]
-              "
-            >
-              {children}
-            </h3>
-          ),
-
-          // ----------------------------------------------------
-          // PARAGRAPHS
-          // ----------------------------------------------------
-
           p: ({ children }) => (
-            <p
-              className="
-                mb-3
-                last:mb-0
-              "
-            >
+            <p className="mb-[8px] last:mb-0">
               {children}
             </p>
           ),
 
-          // ----------------------------------------------------
-          // BOLD / ITALIC
-          // ----------------------------------------------------
-
-          strong: ({ children }) => (
-            <strong className="font-bold text-[#13264B]">
-              {children}
-            </strong>
-          ),
-
-          em: ({ children }) => (
-            <em className="italic">
-              {children}
-            </em>
-          ),
-
-          // ----------------------------------------------------
-          // UNORDERED LIST
-          // ----------------------------------------------------
-
           ul: ({ children }) => (
-            <ul
-              className="
-                mb-3
-                ml-5
-                list-disc
-                space-y-1
-              "
-            >
+            <ul className="my-[3px] space-y-[1px]">
               {children}
             </ul>
           ),
 
-          // ----------------------------------------------------
-          // ORDERED LIST
-          // ----------------------------------------------------
-
-          ol: ({ children }) => (
-            <ol
-              className="
-                mb-3
-                ml-5
-                list-decimal
-                space-y-1
-              "
-            >
-              {children}
-            </ol>
-          ),
-
-          // ----------------------------------------------------
-          // LIST ITEM
-          // ----------------------------------------------------
-
           li: ({ children }) => (
-            <li className="pl-1">
+            <div>{children}</div>
+          ),
+
+          strong: ({ children }) => (
+            <strong className="font-bold">
               {children}
-            </li>
-          ),
-
-          // ----------------------------------------------------
-          // LINKS
-          // ----------------------------------------------------
-
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="
-                font-medium
-                text-[#0B7A33]
-                underline
-                underline-offset-2
-              "
-            >
-              {children}
-            </a>
-          ),
-
-          // ----------------------------------------------------
-          // INLINE CODE
-          // ----------------------------------------------------
-
-          code: ({ inline, children }) => {
-            if (inline) {
-              return (
-                <code
-                  className="
-                    rounded
-                    bg-[#F1F3F5]
-                    px-1.5
-                    py-0.5
-                    font-mono
-                    text-[12px]
-                    text-[#13264B]
-                  "
-                >
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <code
-                className="
-                  block
-                  overflow-x-auto
-                  rounded-lg
-                  bg-[#F4F5F7]
-                  p-3
-                  font-mono
-                  text-[12px]
-                  leading-5
-                  text-[#25364D]
-                "
-              >
-                {children}
-              </code>
-            );
-          },
-
-          // ----------------------------------------------------
-          // BLOCKQUOTE
-          // ----------------------------------------------------
-
-          blockquote: ({ children }) => (
-            <blockquote
-              className="
-                my-3
-                border-l-4
-                border-[#C9D8CC]
-                bg-[#F7FBF8]
-                px-3
-                py-2
-                text-[#526173]
-              "
-            >
-              {children}
-            </blockquote>
-          ),
-
-          // ----------------------------------------------------
-          // HORIZONTAL RULE
-          // ----------------------------------------------------
-
-          hr: () => (
-            <hr
-              className="
-                my-4
-                border-[#E7E2D8]
-              "
-            />
-          ),
-
-          // ----------------------------------------------------
-          // TABLE
-          // ----------------------------------------------------
-
-          table: ({ children }) => (
-            <div
-              className="
-                my-3
-                w-full
-                overflow-x-auto
-                rounded-lg
-                border
-                border-[#E1DDD5]
-              "
-            >
-              <table
-                className="
-                  w-full
-                  min-w-[520px]
-                  border-collapse
-                  text-left
-                  text-[12px]
-                  leading-5
-                "
-              >
-                {children}
-              </table>
-            </div>
-          ),
-
-          // ----------------------------------------------------
-          // TABLE HEADER
-          // ----------------------------------------------------
-
-          thead: ({ children }) => (
-            <thead className="bg-[#F5F7F4]">
-              {children}
-            </thead>
-          ),
-
-          th: ({ children }) => (
-            <th
-              className="
-                border-b
-                border-[#DDD8CF]
-                px-3
-                py-2.5
-                font-bold
-                text-[#13264B]
-              "
-            >
-              {children}
-            </th>
-          ),
-
-          // ----------------------------------------------------
-          // TABLE BODY
-          // ----------------------------------------------------
-
-          tbody: ({ children }) => (
-            <tbody>
-              {children}
-            </tbody>
-          ),
-
-          // ----------------------------------------------------
-          // TABLE ROW
-          // ----------------------------------------------------
-
-          tr: ({ children }) => (
-            <tr
-              className="
-                border-b
-                border-[#E9E5DE]
-                last:border-b-0
-              "
-            >
-              {children}
-            </tr>
-          ),
-
-          // ----------------------------------------------------
-          // TABLE CELL
-          // ----------------------------------------------------
-
-          td: ({ children }) => (
-            <td
-              className="
-                px-3
-                py-2.5
-                align-top
-                text-[#35465A]
-              "
-            >
-              {children}
-            </td>
+            </strong>
           ),
         }}
       >
-        {normalizedContent}
+        {content}
       </ReactMarkdown>
     </div>
   );
@@ -401,26 +70,150 @@ function MedicalMarkdown({ content }) {
 
 
 // ============================================================
-// COMPONENT
+// QUICK ACTION BUTTON
+// ============================================================
+
+function QuickAction({
+  label,
+  icon: Icon,
+  onClick,
+  green = false,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        flex
+        h-[36px]
+        items-center
+        gap-[8px]
+        rounded-full
+        border
+        border-[#DDE3E5]
+        bg-white
+        px-[15px]
+        text-[12px]
+        font-medium
+        transition-all
+        duration-200
+        hover:bg-[#F7FBF8]
+        ${
+          green
+            ? "text-[#14914A]"
+            : "text-[#173E78]"
+        }
+      `}
+    >
+      <Icon
+        size={17}
+        strokeWidth={1.7}
+      />
+
+      {label}
+    </button>
+  );
+}
+
+
+// ============================================================
+// SUGGESTION BUTTON
+// ============================================================
+
+function SuggestionButton({
+  text,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="
+        flex
+        h-[62px]
+        items-center
+        gap-[14px]
+        rounded-[13px]
+        border
+        border-[#DDEBE2]
+        bg-white
+        px-[18px]
+        text-left
+        text-[14px]
+        text-[#4B5563]
+        transition-all
+        duration-200
+        hover:border-[#B8DCC4]
+        hover:bg-[#F8FCF9]
+      "
+    >
+      <span
+        className="
+          flex
+          h-[30px]
+          w-[30px]
+          shrink-0
+          items-center
+          justify-center
+          rounded-full
+          bg-[#F0F8F2]
+        "
+      >
+        <span
+          className="
+            text-[15px]
+            text-[#248A52]
+          "
+        >
+          ▣
+        </span>
+      </span>
+
+      <span>
+        {text}
+      </span>
+    </button>
+  );
+}
+
+
+// ============================================================
+// MEDICAL ASSISTANT
 // ============================================================
 
 export default function MedicalChatbot({
-  selectedLocation = null,
-  className = "",
+  selectedLocation,
 }) {
-  const [messages, setMessages] = useState([
-    INITIAL_MESSAGE,
-  ]);
 
-  const [input, setInput] = useState("");
+  // ==========================================================
+  // CHAT STATE
+  // ==========================================================
 
-  const [loading, setLoading] = useState(false);
+  /*
+   * IMPORTANT:
+   *
+   * Start with an empty conversation.
+   * This makes the initial Medical Assistant screen match
+   * the reference design.
+   */
 
-  const [error, setError] = useState("");
+  const [
+    messages,
+    setMessages,
+  ] = useState([]);
 
-  const messagesEndRef = useRef(null);
+  const [
+    input,
+    setInput,
+  ] = useState("");
 
-  const inputRef = useRef(null);
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
+  const endRef =
+    useRef(null);
 
 
   // ==========================================================
@@ -428,53 +221,56 @@ export default function MedicalChatbot({
   // ==========================================================
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
+
+    endRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages, loading]);
 
-
-  // ==========================================================
-  // FOCUS INPUT
-  // ==========================================================
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  }, [
+    messages,
+    loading,
+  ]);
 
 
   // ==========================================================
   // SEND MESSAGE
   // ==========================================================
 
-  const sendMessage = async (messageOverride = null) => {
-    const text =
-      typeof messageOverride === "string"
-        ? messageOverride.trim()
-        : input.trim();
+  const sendMessage = async (
+    presetMessage = null
+  ) => {
 
-    if (!text || loading) {
+    const text = (
+      presetMessage !== null
+        ? presetMessage
+        : input
+    ).trim();
+
+
+    if (
+      !text ||
+      loading
+    ) {
       return;
     }
 
 
-    setError("");
-
-
     const userMessage = {
-      id: `${Date.now()}-user`,
       role: "user",
       content: text,
+      time: "Now",
     };
 
 
-    const conversationBeforeRequest = [
+    const conversation = [
       ...messages,
       userMessage,
     ];
 
 
-    setMessages(conversationBeforeRequest);
+    setMessages(
+      conversation
+    );
 
     setInput("");
 
@@ -482,85 +278,49 @@ export default function MedicalChatbot({
 
 
     try {
+
       const response =
         await api.medicalChat({
           message: text,
-
-          conversation: conversationBeforeRequest
-            .filter(
-              (message) =>
-                message.role === "user" ||
-                message.role === "assistant"
-            )
-            .slice(-12)
-            .map((message) => ({
-              role: message.role,
-              content: message.content,
-            })),
-
-          location: selectedLocation
-            ? {
-                stateId:
-                  selectedLocation.stateId ?? null,
-
-                stateName:
-                  selectedLocation.stateName ?? null,
-
-                districtId:
-                  selectedLocation.districtId ?? null,
-
-                districtName:
-                  selectedLocation.districtName ?? null,
-
-                talukId:
-                  selectedLocation.talukId ?? null,
-
-                talukName:
-                  selectedLocation.talukName ?? null,
-              }
-            : null,
+          conversation,
+          location:
+            selectedLocation || null,
         });
 
 
-      const assistantMessage = {
-        id: `${Date.now()}-assistant`,
-        role: "assistant",
-        content:
-          response?.answer ||
-          "I was unable to generate a response.",
-      };
+      setMessages(
+        previous => [
+          ...previous,
+          {
+            role: "assistant",
+            content:
+              response?.response ||
+              response?.message ||
+              response?.answer ||
+              "I couldn't generate a response right now.",
+            time: "Now",
+          },
+        ]
+      );
 
+    } catch (error) {
 
-      setMessages((previous) => [
-        ...previous,
-        assistantMessage,
-      ]);
-
-    } catch (err) {
-      setError(
-        err?.message ||
-          "Unable to contact the medical assistant."
+      setMessages(
+        previous => [
+          ...previous,
+          {
+            role: "assistant",
+            content:
+              "I'm currently unable to connect to the medical assistant. Please try again shortly.",
+            time: "Now",
+          },
+        ]
       );
 
     } finally {
+
       setLoading(false);
 
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
-    }
-  };
-
-
-  // ==========================================================
-  // ENTER KEY
-  // ==========================================================
-
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-
-      sendMessage();
     }
   };
 
@@ -570,21 +330,55 @@ export default function MedicalChatbot({
   // ==========================================================
 
   const clearChat = () => {
-    setMessages([
-      {
-        ...INITIAL_MESSAGE,
-        id: `initial-${Date.now()}`,
-      },
-    ]);
+
+    if (loading) {
+      return;
+    }
+
+    /*
+     * IMPORTANT:
+     * Actually clear the conversation.
+     *
+     * Do NOT restore INITIAL_MESSAGES.
+     */
+
+    setMessages([]);
 
     setInput("");
-
-    setError("");
-
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 50);
   };
+
+
+  // ==========================================================
+  // ENTER KEY
+  // ==========================================================
+
+  const handleKeyDown = (
+    event
+  ) => {
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      sendMessage();
+
+    }
+  };
+
+
+  // ==========================================================
+  // QUICK QUESTIONS
+  // ==========================================================
+
+  const quickQuestions = [
+    "How to prevent dengue?",
+    "What causes headache?",
+    "Tips for a healthy lifestyle",
+    "Is fever always a sign of infection?",
+  ];
 
 
   // ==========================================================
@@ -592,171 +386,269 @@ export default function MedicalChatbot({
   // ==========================================================
 
   return (
-    <div
-      className={`
-        flex
-        h-full
-        min-h-[600px]
-        w-full
-        flex-col
+    <section
+      className="
+        relative
+        h-[862px]
         overflow-hidden
-        rounded-2xl
+        rounded-[15px]
         border
-        border-[#E7E2D8]
+        border-[#E2E5E6]
         bg-white
-        shadow-sm
-        ${className}
-      `}
+      "
     >
 
       {/* ======================================================
-          HEADER
+          HERO
       ====================================================== */}
 
       <div
         className="
-          flex
-          items-center
-          justify-between
-          border-b
-          border-[#E7E2D8]
-          bg-[#FCFAF6]
-          px-5
-          py-4
+          relative
+          mx-[14px]
+          mt-[14px]
+          h-[205px]
+          overflow-hidden
+          rounded-[15px]
+          bg-[#F8FCF8]
         "
       >
 
-        <div className="flex items-center gap-3">
+        {/* ====================================================
+            HERO RIGHT IMAGE
+        ==================================================== */}
+
+        <img
+          src={heroRight}
+          alt=""
+          className="
+            absolute
+            right-0
+            top-0
+            h-full
+            w-[490px]
+            object-cover
+            object-left
+          "
+        />
+
+
+        {/* ====================================================
+            ROBOT
+        ==================================================== */}
+
+        <img
+          src={robot}
+          alt="Medical assistant robot"
+          className="
+            absolute
+            bottom-[-2px]
+            left-[18px]
+            h-[194px]
+            w-[190px]
+            object-contain
+            object-bottom
+          "
+        />
+
+
+        {/* ====================================================
+            HERO TEXT
+        ==================================================== */}
+
+        <div
+          className="
+            absolute
+            left-[213px]
+            top-[31px]
+            z-20
+          "
+        >
+
+          <h2
+            className="
+              text-[25px]
+              font-semibold
+              tracking-[-0.02em]
+              text-[#101A31]
+            "
+          >
+            Hello Monish! 👋
+          </h2>
+
+
+          <h3
+            className="
+              mt-[3px]
+              text-[24px]
+              font-semibold
+              text-[#078445]
+            "
+          >
+            I’m your Medical Assistant
+          </h3>
+
+
+          <p
+            className="
+              mt-[8px]
+              text-[13px]
+              leading-[1.65]
+              text-[#13202A]
+            "
+          >
+            I can help you with health information, precautions,
+            <br />
+            disease risks and general wellness guidance.
+          </p>
+
+
+          {/* ==================================================
+              QUICK ACTIONS
+          ================================================== */}
 
           <div
             className="
+              mt-[18px]
               flex
-              h-10
-              w-10
-              items-center
-              justify-center
-              rounded-xl
-              bg-[#EAF6EE]
-              text-[#0B7A33]
+              gap-[13px]
             "
           >
-            <Bot size={21} />
-          </div>
+
+            <QuickAction
+              label="Precautions"
+              icon={ShieldCheck}
+              green
+              onClick={() =>
+                sendMessage(
+                  "What precautions should I take?"
+                )
+              }
+            />
 
 
-          <div>
+            <QuickAction
+              label="Diseases"
+              icon={Stethoscope}
+              onClick={() =>
+                sendMessage(
+                  "Tell me about common diseases."
+                )
+              }
+            />
 
-            <h2
-              className="
-                text-[15px]
-                font-bold
-                text-[#13264B]
-              "
-            >
-              AI Medical Assistant
-            </h2>
 
-            <p
-              className="
-                mt-0.5
-                text-[11px]
-                text-[#7A8798]
-              "
-            >
-              General medical information
-            </p>
+            <QuickAction
+              label="General Health"
+              icon={HeartPulse}
+              onClick={() =>
+                sendMessage(
+                  "Give me some general health advice."
+                )
+              }
+            />
 
           </div>
 
         </div>
 
 
+        {/* ====================================================
+            CLEAR CHAT BUTTON
+        ====================================================
+
+        IMPORTANT:
+        This is NOT hidden anymore.
+        It is positioned in the top-right of the Medical
+        Assistant hero.
+        ==================================================== */}
+
         <button
           type="button"
           onClick={clearChat}
-          disabled={loading}
-          title="Clear conversation"
+          disabled={
+            loading ||
+            messages.length === 0
+          }
+          aria-label="Clear chat"
+          title="Clear chat"
           className="
-            rounded-lg
-            p-2
-            text-[#7A8798]
-            transition
-            hover:bg-[#F3F0E9]
-            hover:text-[#13264B]
+            absolute
+            right-[18px]
+            top-[15px]
+            z-50
+            flex
+            h-[38px]
+            w-[38px]
+            items-center
+            justify-center
+            rounded-full
+            border
+            border-[#DCE6DF]
+            bg-white
+            text-[#69756F]
+            shadow-[0_3px_12px_rgba(30,80,50,.10)]
+            transition-all
+            duration-200
+            hover:border-[#C8DDD0]
+            hover:bg-[#F5FAF6]
+            hover:text-[#D64545]
             disabled:cursor-not-allowed
-            disabled:opacity-50
+            disabled:opacity-35
           "
         >
-          <Trash2 size={17} />
+
+          <Trash2
+            size={18}
+            strokeWidth={1.8}
+          />
+
         </button>
 
       </div>
 
 
       {/* ======================================================
-          SAFETY NOTICE
+          DATE SEPARATOR
       ====================================================== */}
 
-      <div
-        className="
-          flex
-          gap-2
-          border-b
-          border-[#E7E2D8]
-          bg-[#FFF9E8]
-          px-4
-          py-3
-          text-[11px]
-          leading-5
-          text-[#725B16]
-        "
-      >
-
-        <AlertTriangle
-          size={16}
-          className="mt-0.5 shrink-0"
-        />
-
-        <p>
-          This assistant provides general health
-          information. It does not diagnose medical
-          conditions or prescribe medicines.
-        </p>
-
-      </div>
-
-
-      {/* ======================================================
-          LOCATION CONTEXT
-      ====================================================== */}
-
-      {selectedLocation?.talukName && (
+      {messages.length > 0 && (
 
         <div
           className="
-            border-b
-            border-[#E7E2D8]
-            bg-[#F8FBFD]
-            px-4
-            py-2.5
-            text-[11px]
-            text-[#526173]
+            mx-[18px]
+            flex
+            items-center
+            gap-3
+            py-[20px]
           "
         >
 
-          <span className="font-semibold">
-            Current location:
-          </span>{" "}
+          <div
+            className="
+              h-px
+              flex-1
+              bg-[#E7E9E9]
+            "
+          />
 
-          {selectedLocation.talukName}
+          <span
+            className="
+              px-2
+              text-[13px]
+              text-[#8A8E95]
+            "
+          >
+            Today
+          </span>
 
-          {selectedLocation.districtName
-            ? `, ${selectedLocation.districtName}`
-            : ""}
-
-          {selectedLocation.stateName
-            ? `, ${selectedLocation.stateName}`
-            : ""}
+          <div
+            className="
+              h-px
+              flex-1
+              bg-[#E7E9E9]
+            "
+          />
 
         </div>
 
@@ -764,413 +656,510 @@ export default function MedicalChatbot({
 
 
       {/* ======================================================
-          MESSAGES
+          CHAT / EMPTY STATE AREA
       ====================================================== */}
 
       <div
-        className="
-          flex-1
-          space-y-4
+        className={`
+          relative
+          ${
+            messages.length === 0
+              ? "h-[535px]"
+              : "h-[488px]"
+          }
           overflow-y-auto
-          bg-[#FCFAF6]
-          p-4
-          sm:p-5
-        "
+          px-[22px]
+          ${
+            messages.length > 0
+              ? "pr-[245px]"
+              : "pr-[22px]"
+          }
+        `}
       >
 
-        {messages.map((message) => {
+        {/* ====================================================
+            DOCTOR IMAGE
+        ==================================================== */}
 
-          const isUser =
-            message.role === "user";
-
-
-          return (
-            <div
-              key={message.id}
-              className={`
-                flex
-                gap-2.5
-                ${
-                  isUser
-                    ? "justify-end"
-                    : "justify-start"
-                }
-              `}
-            >
-
-              {!isUser && (
-
-                <div
-                  className="
-                    mt-1
-                    flex
-                    h-8
-                    w-8
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-lg
-                    bg-[#EAF6EE]
-                    text-[#0B7A33]
-                  "
-                >
-                  <Bot size={16} />
-                </div>
-
-              )}
-
-
-              <div
-                className={`
-                  max-w-[82%]
-                  rounded-2xl
-                  px-4
-                  py-3
-                  ${
-                    isUser
-                      ? `
-                        rounded-br-md
-                        bg-[#13264B]
-                        text-white
-                      `
-                      : `
-                        rounded-bl-md
-                        border
-                        border-[#E7E2D8]
-                        bg-white
-                        text-[#35465A]
-                      `
-                  }
-                `}
-              >
-
-                {isUser ? (
-                  <div
-                    className="
-                      whitespace-pre-wrap
-                      break-words
-                      text-[13px]
-                      leading-6
-                    "
-                  >
-                    {message.content}
-                  </div>
-                ) : (
-                  <MedicalMarkdown
-                    content={message.content}
-                  />
-                )}
-
-              </div>
-
-
-              {isUser && (
-
-                <div
-                  className="
-                    mt-1
-                    flex
-                    h-8
-                    w-8
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-lg
-                    bg-[#E8EEF5]
-                    text-[#13264B]
-                  "
-                >
-                  <User size={16} />
-                </div>
-
-              )}
-
-            </div>
-          );
-        })}
+        <img
+          src={doctor}
+          alt="Medical professional"
+          className="
+            pointer-events-none
+            absolute
+            right-[8px]
+            top-[77px]
+            h-[223px]
+            w-[235px]
+            object-contain
+          "
+        />
 
 
         {/* ====================================================
-            LOADING
+            EMPTY STATE
         ==================================================== */}
 
-        {loading && (
+        {messages.length === 0 ? (
 
           <div
             className="
               flex
-              items-start
-              gap-2.5
+              h-full
+              flex-col
+              items-center
+              pt-[34px]
             "
           >
 
+            {/* BOT AVATAR */}
+
             <div
               className="
                 flex
-                h-8
-                w-8
-                shrink-0
+                h-[66px]
+                w-[66px]
                 items-center
                 justify-center
-                rounded-lg
-                bg-[#EAF6EE]
-                text-[#0B7A33]
               "
             >
-              <Bot size={16} />
+
+              <img
+                src={botAvatar}
+                alt=""
+                className="
+                  h-[66px]
+                  w-[66px]
+                  object-contain
+                "
+              />
+
             </div>
 
+
+            {/* TITLE */}
+
+            <h2
+              className="
+                mt-[14px]
+                text-center
+                text-[24px]
+                font-medium
+                tracking-[-0.025em]
+                text-[#101827]
+              "
+            >
+              Ask any medical related issues
+            </h2>
+
+
+            {/* DESCRIPTION */}
+
+            <p
+              className="
+                mt-[10px]
+                text-center
+                text-[15px]
+                leading-[1.7]
+                text-[#526174]
+              "
+            >
+              Get information about symptoms, precautions, diseases,
+              <br />
+              healthy habits and general wellness.
+            </p>
+
+
+            {/* ==================================================
+                SUGGESTION GRID
+            ================================================== */}
 
             <div
               className="
-                flex
-                items-center
-                gap-2
-                rounded-2xl
-                rounded-bl-md
-                border
-                border-[#E7E2D8]
-                bg-white
-                px-4
-                py-3
+                mt-[34px]
+                grid
+                w-[650px]
+                max-w-full
+                grid-cols-2
+                gap-[16px]
               "
             >
 
-              <Loader2
-                size={15}
-                className="animate-spin"
-              />
-
-              <span
-                className="
-                  text-[12px]
-                  text-[#7A8798]
-                "
-              >
-                Thinking...
-              </span>
+              {quickQuestions.map(
+                question => (
+                  <SuggestionButton
+                    key={question}
+                    text={question}
+                    onClick={() =>
+                      sendMessage(
+                        question
+                      )
+                    }
+                  />
+                )
+              )}
 
             </div>
+
+          </div>
+
+        ) : (
+
+          /* ===================================================
+             CHAT MESSAGES
+          =================================================== */
+
+          <div
+            className="
+              space-y-[24px]
+            "
+          >
+
+            {messages.map(
+              (
+                message,
+                index
+              ) => {
+
+                const user =
+                  message.role === "user";
+
+                return (
+
+                  <div
+                    key={index}
+                    className={`
+                      flex
+                      ${
+                        user
+                          ? "justify-end"
+                          : "justify-start"
+                      }
+                    `}
+                  >
+
+                    {!user && (
+
+                      <img
+                        src={botAvatar}
+                        alt=""
+                        className="
+                          mr-[14px]
+                          mt-[4px]
+                          h-[54px]
+                          w-[54px]
+                          shrink-0
+                          rounded-full
+                          object-cover
+                        "
+                      />
+
+                    )}
+
+
+                    <div
+                      className={`
+                        max-w-[520px]
+                        ${
+                          user
+                            ? `
+                              rounded-[15px]
+                              rounded-br-[4px]
+                              bg-[#EAF8EC]
+                              px-[19px]
+                              py-[12px]
+                            `
+                            : `
+                              rounded-[15px]
+                              border
+                              border-[#E0E4E4]
+                              bg-white
+                              px-[18px]
+                              py-[13px]
+                              shadow-[0_1px_2px_rgba(0,0,0,0.02)]
+                            `
+                        }
+                      `}
+                    >
+
+                      {user ? (
+
+                        <p
+                          className="
+                            text-[13px]
+                            text-[#10231A]
+                          "
+                        >
+                          {message.content}
+                        </p>
+
+                      ) : (
+
+                        <MedicalMarkdown
+                          content={
+                            message.content
+                          }
+                        />
+
+                      )}
+
+
+                      <div
+                        className="
+                          mt-[4px]
+                          text-right
+                          text-[10px]
+                          text-[#7C858C]
+                        "
+                      >
+                        {message.time}
+
+                        {user &&
+                          "  ✓✓"}
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                );
+              }
+            )}
+
+
+            {/* =================================================
+                LOADING
+            ================================================= */}
+
+            {loading && (
+
+              <div
+                className="
+                  flex
+                  items-start
+                "
+              >
+
+                <img
+                  src={botAvatar}
+                  alt=""
+                  className="
+                    mr-[14px]
+                    h-[54px]
+                    w-[54px]
+                    rounded-full
+                  "
+                />
+
+                <div
+                  className="
+                    rounded-[15px]
+                    border
+                    border-[#E0E4E4]
+                    bg-white
+                    px-4
+                    py-3
+                    text-[12px]
+                    text-[#6B7379]
+                  "
+                >
+                  Medical assistant is thinking...
+                </div>
+
+              </div>
+
+            )}
+
+
+            <div
+              ref={endRef}
+            />
 
           </div>
 
         )}
 
-
-        <div ref={messagesEndRef} />
-
       </div>
 
 
       {/* ======================================================
-          ERROR
-      ====================================================== */}
-
-      {error && (
-
-        <div
-          className="
-            border-t
-            border-[#F1D0D0]
-            bg-[#FFF5F5]
-            px-4
-            py-2.5
-            text-[11px]
-            text-[#B42318]
-          "
-        >
-          {error}
-        </div>
-
-      )}
-
-
-      {/* ======================================================
-          SUGGESTED QUESTIONS
-      ====================================================== */}
-
-      {messages.length === 1 && !loading && (
-
-        <div
-          className="
-            border-t
-            border-[#E7E2D8]
-            bg-white
-            px-4
-            py-3
-          "
-        >
-
-          <p
-            className="
-              mb-2
-              text-[10px]
-              font-semibold
-              uppercase
-              tracking-[0.12em]
-              text-[#9A9489]
-            "
-          >
-            Try asking
-          </p>
-
-
-          <div
-            className="
-              flex
-              flex-wrap
-              gap-2
-            "
-          >
-
-            {SUGGESTED_QUESTIONS.map(
-              (question) => (
-
-                <button
-                  key={question}
-                  type="button"
-                  onClick={() =>
-                    sendMessage(question)
-                  }
-                  className="
-                    rounded-full
-                    border
-                    border-[#DCE5DD]
-                    bg-[#F7FBF8]
-                    px-3
-                    py-1.5
-                    text-left
-                    text-[11px]
-                    text-[#315C40]
-                    transition
-                    hover:border-[#AFC9B7]
-                    hover:bg-[#EEF7F0]
-                  "
-                >
-                  {question}
-                </button>
-
-              )
-            )}
-
-          </div>
-
-        </div>
-
-      )}
-
-
-      {/* ======================================================
-          INPUT
+          INPUT BOX
       ====================================================== */}
 
       <div
         className="
-          border-t
-          border-[#E7E2D8]
+          absolute
+          bottom-[44px]
+          left-[70px]
+          right-[184px]
+          flex
+          h-[70px]
+          items-center
+          rounded-[17px]
+          border
+          border-[#4AB477]
           bg-white
-          p-3
+          px-[14px]
+          shadow-[0_2px_11px_rgba(39,135,83,0.14)]
         "
       >
 
-        <div
+        {/* ====================================================
+            ATTACHMENT
+        ==================================================== */}
+
+        <button
+          type="button"
           className="
+            mr-[14px]
             flex
-            items-end
-            gap-2
-            rounded-xl
-            border
-            border-[#DCD7CE]
-            bg-[#FCFAF6]
-            px-3
-            py-2
-            transition
-            focus-within:border-[#A9B8C8]
-            focus-within:ring-2
-            focus-within:ring-[#E8EEF5]
+            h-[42px]
+            w-[30px]
+            shrink-0
+            items-center
+            justify-center
+            text-[#65717B]
           "
+          aria-label="Attach"
         >
 
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) =>
-              setInput(event.target.value)
-            }
-            onKeyDown={handleKeyDown}
-            placeholder="Ask a medical question..."
-            rows={1}
-            maxLength={2000}
-            disabled={loading}
-            className="
-              max-h-28
-              min-h-[38px]
-              flex-1
-              resize-none
-              bg-transparent
-              py-2
-              text-[13px]
-              text-[#1F3144]
-              outline-none
-              placeholder:text-[#9A9489]
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-            "
+          <Paperclip
+            size={21}
+            strokeWidth={1.7}
           />
 
-
-          <button
-            type="button"
-            onClick={() => sendMessage()}
-            disabled={
-              loading ||
-              !input.trim()
-            }
-            title="Send message"
-            className="
-              flex
-              h-9
-              w-9
-              shrink-0
-              items-center
-              justify-center
-              rounded-lg
-              bg-[#13264B]
-              text-white
-              transition
-              hover:bg-[#1B3A62]
-              disabled:cursor-not-allowed
-              disabled:opacity-40
-            "
-          >
-
-            {loading ? (
-              <Loader2
-                size={16}
-                className="animate-spin"
-              />
-            ) : (
-              <Send size={16} />
-            )}
-
-          </button>
-
-        </div>
+        </button>
 
 
-        <p
+        {/* ====================================================
+            TEXT INPUT
+
+            IMPORTANT:
+            Using INPUT instead of TEXTAREA here fixes the
+            vertical clipping problem completely.
+        ==================================================== */}
+
+        <input
+          type="text"
+          value={input}
+          onChange={(e) =>
+            setInput(e.target.value)
+          }
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+          placeholder="Type your medical question here..."
           className="
-            mt-2
-            px-1
-            text-[9px]
-            text-[#9A9489]
+            h-[42px]
+            min-w-0
+            flex-1
+            border-0
+            bg-transparent
+            px-[5px]
+            py-0
+            text-[14px]
+            leading-[42px]
+            text-[#151719]
+            outline-none
+            placeholder:text-[#9BA3AC]
+            placeholder:opacity-100
+            disabled:opacity-50
           "
+        />
+
+
+        {/* ====================================================
+            SEND
+        ==================================================== */}
+
+        <button
+          type="button"
+          onClick={() =>
+            sendMessage()
+          }
+          disabled={
+            loading ||
+            !input.trim()
+          }
+          className="
+            flex
+            h-[48px]
+            w-[48px]
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            bg-[#168D43]
+            text-white
+            transition-all
+            duration-200
+            hover:bg-[#11783A]
+            disabled:cursor-not-allowed
+            disabled:opacity-45
+          "
+          aria-label="Send"
         >
-          Press Enter to send · Shift + Enter for a new line
-        </p>
+
+          <Send
+            size={22}
+            strokeWidth={1.8}
+          />
+
+        </button>
 
       </div>
 
-    </div>
+
+      {/* ======================================================
+          VOICE BUTTON
+      ====================================================== */}
+
+      <button
+        type="button"
+        className="
+          absolute
+          bottom-[43px]
+          right-[28px]
+          flex
+          h-[70px]
+          w-[66px]
+          items-center
+          justify-center
+          rounded-[16px]
+          border
+          border-[#E1E5E7]
+          bg-white
+          text-[#102A43]
+        "
+        aria-label="Voice input"
+      >
+
+        <Mic
+          size={23}
+          strokeWidth={1.6}
+        />
+
+      </button>
+
+
+      {/* ======================================================
+          DISCLAIMER
+      ====================================================== */}
+
+      <p
+        className="
+          absolute
+          bottom-[8px]
+          left-0
+          right-0
+          text-center
+          text-[12px]
+          text-[#4C5157]
+        "
+      >
+        Medical Assistant provides general information only and not a
+        diagnosis or medical advice.
+      </p>
+
+    </section>
   );
 }

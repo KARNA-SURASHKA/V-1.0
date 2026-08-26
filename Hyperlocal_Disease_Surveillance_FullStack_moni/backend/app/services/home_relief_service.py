@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -128,6 +127,31 @@ def normalize_text(
 
 
 # ============================================================
+# EXACT PHRASE LIST
+# ============================================================
+
+def split_phrases(
+    value: Optional[str],
+) -> List[str]:
+
+    if not value:
+        return []
+
+    normalized = (
+        value
+        .replace(";", ",")
+        .replace("|", ",")
+        .replace("\n", ",")
+    )
+
+    return [
+        normalize_text(part)
+        for part in normalized.split(",")
+        if normalize_text(part)
+    ]
+
+
+# ============================================================
 # CONTEXT DETECTION
 # ============================================================
 
@@ -142,13 +166,13 @@ def parse_context(
     for condition, keywords in CONDITION_KEYWORDS.items():
 
         if any(
-            keyword in text
+            normalize_text(keyword) in text
             for keyword in keywords
         ):
             conditions.append(condition)
 
     pregnancy = any(
-        keyword in text
+        normalize_text(keyword) in text
         for keyword in [
             "pregnant",
             "pregnancy",
@@ -160,7 +184,7 @@ def parse_context(
     )
 
     breastfeeding = any(
-        keyword in text
+        normalize_text(keyword) in text
         for keyword in [
             "breastfeeding",
             "breast feeding",
@@ -182,11 +206,8 @@ def parse_context(
 
     return {
         "conditions": conditions,
-
         "pregnancy": pregnancy,
-
         "breastfeeding": breastfeeding,
-
         "age": (
             "infant"
             if "infant" in conditions
@@ -195,8 +216,7 @@ def parse_context(
                 if "child" in conditions
                 else (
                     "older_adult"
-                    if "older_adult"
-                    in conditions
+                    if "older_adult" in conditions
                     else None
                 )
             )
@@ -325,8 +345,7 @@ def evaluate_remedy(
 
         elif (
             status == NOT_RECOMMENDED
-            and final_status
-            != CONTRAINDICATED
+            and final_status != CONTRAINDICATED
         ):
 
             final_status = NOT_RECOMMENDED
@@ -351,26 +370,14 @@ def evaluate_remedy(
         "matched_rules": [
             {
                 "id": rule.id,
-
-                "condition_type":
-                    rule.condition_type,
-
-                "condition_value":
-                    rule.condition_value,
-
-                "suitability":
-                    rule.suitability,
-
-                "severity":
-                    rule.severity,
-
-                "reason":
-                    rule.reason,
-
+                "condition_type": rule.condition_type,
+                "condition_value": rule.condition_value,
+                "suitability": rule.suitability,
+                "severity": rule.severity,
+                "reason": rule.reason,
                 "alternative_remedy_id":
                     rule.alternative_remedy_id,
             }
-
             for rule in matched
         ],
     }
@@ -378,6 +385,24 @@ def evaluate_remedy(
 
 # ============================================================
 # SEARCH DATABASE
+# ============================================================
+#
+# IMPORTANT:
+#
+# A user search must NOT perform a broad substring search.
+#
+# Example:
+#
+# Database symptom:
+# "Fever, headache, body aches, fatigue..."
+#
+# User searches:
+# "Headache"
+#
+# This must NOT match.
+#
+# Only an explicitly stored symptom/alias should match.
+#
 # ============================================================
 
 def search_remedies(
@@ -387,40 +412,10 @@ def search_remedies(
 
     text = normalize_text(query)
 
-    terms = [
-        term
-        for term in text.split()
-        if len(term) > 2
-    ]
-
-    if not terms:
+    if not text:
         return []
 
-    clauses = []
-
-    for term in terms:
-
-        clauses.extend(
-            [
-                models.HomeReliefRemedy.name.ilike(
-                    f"%{term}%"
-                ),
-
-                models.HomeReliefRemedy.disease.ilike(
-                    f"%{term}%"
-                ),
-
-                models.HomeReliefRemedy.symptom.ilike(
-                    f"%{term}%"
-                ),
-
-                models.HomeReliefRemedy.aliases.ilike(
-                    f"%{term}%"
-                ),
-            ]
-        )
-
-    return (
+    remedies = (
         db.query(
             models.HomeReliefRemedy
         )
@@ -428,19 +423,71 @@ def search_remedies(
             models.HomeReliefRemedy.status
             == "ACTIVE"
         )
-        .filter(
-            or_(*clauses)
-        )
         .order_by(
-            models.HomeReliefRemedy.name.asc()
+            models.HomeReliefRemedy.updated_at.desc()
         )
-        .distinct()
         .all()
     )
 
+    matched = []
+
+    for remedy in remedies:
+
+        # ----------------------------------------------------
+        # EXACT SYMPTOM MATCH
+        # ----------------------------------------------------
+
+        symptom_phrases = split_phrases(
+            remedy.symptom
+        )
+
+        if text in symptom_phrases:
+            matched.append(remedy)
+            continue
+
+        # ----------------------------------------------------
+        # EXACT ALIAS MATCH
+        # ----------------------------------------------------
+
+        alias_phrases = split_phrases(
+            remedy.aliases
+        )
+
+        if text in alias_phrases:
+            matched.append(remedy)
+            continue
+
+        # ----------------------------------------------------
+        # EXACT REMEDY NAME MATCH
+        #
+        # Allows searching the actual remedy name.
+        # ----------------------------------------------------
+
+        if (
+            normalize_text(remedy.name)
+            == text
+        ):
+            matched.append(remedy)
+            continue
+
+        # ----------------------------------------------------
+        # EXACT DISEASE MATCH
+        #
+        # Allows searching "Dengue", "Influenza", etc.
+        # ----------------------------------------------------
+
+        if (
+            normalize_text(remedy.disease)
+            == text
+        ):
+            matched.append(remedy)
+            continue
+
+    return matched
+
 
 # ============================================================
-# SERIALIZE
+# SERIALIZE REMEDY
 # ============================================================
 
 def serialize_remedy(
@@ -455,6 +502,7 @@ def serialize_remedy(
             "conditions": [],
             "pregnancy": False,
             "breastfeeding": False,
+            "age": None,
         }
 
     evaluation = evaluate_remedy(
@@ -470,9 +518,7 @@ def serialize_remedy(
 
     alternatives = []
 
-    for rule in evaluation[
-        "matched_rules"
-    ]:
+    for rule in evaluation["matched_rules"]:
 
         alternative_id = (
             rule.get(
@@ -608,26 +654,19 @@ def serialize_remedy(
         "safety_rules": [
             {
                 "id": rule.id,
-
                 "condition_type":
                     rule.condition_type,
-
                 "condition_value":
                     rule.condition_value,
-
                 "suitability":
                     rule.suitability,
-
                 "severity":
                     rule.severity,
-
                 "reason":
                     rule.reason,
-
                 "alternative_remedy_id":
                     rule.alternative_remedy_id,
             }
-
             for rule in all_rules
         ],
 
@@ -650,9 +689,7 @@ def search_home_relief(
     query: str,
 ) -> Dict[str, Any]:
 
-    context = parse_context(
-        query
-    )
+    context = parse_context(query)
 
     remedies = search_remedies(
         db,
@@ -660,11 +697,8 @@ def search_home_relief(
     )
 
     recommended = []
-
     caution = []
-
     restricted = []
-
     alternatives = []
 
     for remedy in remedies:
@@ -675,9 +709,7 @@ def search_home_relief(
             context,
         )
 
-        status = (
-            item["safety"]["status"]
-        )
+        status = item["safety"]["status"]
 
         if status == SAFE:
 
@@ -770,9 +802,7 @@ def build_chat_home_relief_context(
         ),
     ]
 
-    for item in result[
-        "recommended"
-    ]:
+    for item in result["recommended"]:
 
         lines.extend(
             [
@@ -790,42 +820,28 @@ def build_chat_home_relief_context(
             ]
         )
 
-        if item.get(
-            "expected_benefit"
-        ):
+        if item.get("expected_benefit"):
 
             lines.append(
                 "Expected benefit: "
-                + item[
-                    "expected_benefit"
-                ]
+                + item["expected_benefit"]
             )
 
-        if item.get(
-            "general_safety_notes"
-        ):
+        if item.get("general_safety_notes"):
 
             lines.append(
                 "Safety notes: "
-                + item[
-                    "general_safety_notes"
-                ]
+                + item["general_safety_notes"]
             )
 
-        if item.get(
-            "when_to_seek_care"
-        ):
+        if item.get("when_to_seek_care"):
 
             lines.append(
                 "When to seek care: "
-                + item[
-                    "when_to_seek_care"
-                ]
+                + item["when_to_seek_care"]
             )
 
-    for item in result[
-        "use_with_caution"
-    ]:
+    for item in result["use_with_caution"]:
 
         lines.extend(
             [
@@ -841,11 +857,7 @@ def build_chat_home_relief_context(
             ]
         )
 
-        for rule in item[
-            "safety"
-        ][
-            "matched_rules"
-        ]:
+        for rule in item["safety"]["matched_rules"]:
 
             if rule.get("reason"):
 
@@ -854,20 +866,14 @@ def build_chat_home_relief_context(
                     + rule["reason"]
                 )
 
-    for item in result[
-        "restricted"
-    ]:
+    for item in result["restricted"]:
 
         lines.append(
             "\nRestricted remedy: "
             + item["name"]
         )
 
-        for rule in item[
-            "safety"
-        ][
-            "matched_rules"
-        ]:
+        for rule in item["safety"]["matched_rules"]:
 
             if rule.get("reason"):
 

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
+
+/* ============================================================
+   GLOBAL
+============================================================ */
+
 :root {
+
   font-family:
     Inter,
     ui-sans-serif,
@@ -11,43 +17,415 @@
     sans-serif;
 
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+
+  text-rendering:
+    optimizeLegibility;
+
+  -webkit-font-smoothing:
+    antialiased;
+
+  -moz-osx-font-smoothing:
+    grayscale;
 }
+
 
 html,
 body,
 #root {
+
   width: 100%;
+
   min-height: 100%;
+
   margin: 0;
+
   padding: 0;
+
 }
 
+
 body {
-  background: #F5F1E9;
+
+  background:
+    #F5F1E9;
+
 }
+
 
 button,
 input,
 textarea,
 select {
+
   font: inherit;
+
 }
 
+
 button {
-  -webkit-tap-highlight-color: transparent;
+
+  -webkit-tap-highlight-color:
+    transparent;
+
 }
+
+
+/* ============================================================
+   EXISTING GLOBAL COMPONENTS
+============================================================ */
 
 @layer components {
 
   .input {
-    @apply w-full rounded-lg border border-[#E8E2D8] px-3 py-2.5 text-[14px] text-[#1F3144] focus:outline-none focus:ring-2 focus:ring-[#0B7A33]/30;
+
+    @apply
+      w-full
+      rounded-lg
+      border
+      border-[#E8E2D8]
+      px-3
+      py-2.5
+      text-[14px]
+      text-[#1F3144]
+      focus:outline-none
+      focus:ring-2
+      focus:ring-[#0B7A33]/30;
+
   }
 
+
   .btn-primary {
-    @apply w-full rounded-lg bg-gradient-to-r from-[#07892F] to-[#049437] hover:from-[#067C2B] hover:to-[#038A31] text-white font-semibold py-2.5 transition-all disabled:opacity-60;
+
+    @apply
+      w-full
+      rounded-lg
+      bg-gradient-to-r
+      from-[#07892F]
+      to-[#049437]
+      text-white
+      font-semibold
+      py-2.5
+      transition-all
+      disabled:opacity-60;
+
+  }
+
+}
+
+
+/* ============================================================
+   MEDICAL ASSISTANT PAGE
+============================================================ */
+
+/*
+  IMPORTANT:
+
+  Your existing UserPortal wraps MedicalChatbot inside
+  PageContainer and also creates a generic page header.
+
+  We do NOT need to modify UserPortal.jsx.
+
+  These selectors automatically detect the Medical Assistant
+  page and adjust the existing shell only for this page.
+*/
+
+
+/* ------------------------------------------------------------
+   MAIN AREA
+------------------------------------------------------------ */
+
+@media (min-width: 1024px) {
+
+  main:has(.medical-assistant-page) {
+
+    margin-left:
+      260px !important;
+
+    min-height:
+      100vh;
+
+    background:
+      #FFFFFF;
+
+  }
+
+
+  /* ----------------------------------------------------------
+     HIDE GENERIC USER PORTAL HEADER
+  ---------------------------------------------------------- */
+
+  main:has(.medical-assistant-page)
+  > header {
+
+    display:
+      none !important;
+
+  }
+
+
+  /* ----------------------------------------------------------
+     MEDICAL ASSISTANT SIDEBAR
+  ---------------------------------------------------------- */
+
+  aside:has(
+    + main .medical-assistant-page
+  ) {
+
+    width:
+      260px !important;
+
+  }
+
+
+  /* ----------------------------------------------------------
+     ACTIVE MEDICAL ASSISTANT / HOME RELIEF STYLE
+  ---------------------------------------------------------- */
+
+  aside:has(
+    + main .medical-assistant-page
+  )
+  button[class*="F0E3D2"] {
+
+    background:
+      #E5F4E8 !important;
+
+    color:
+      #087A32 !important;
+
+    font-weight:
+      500 !important;
+
+  }
+
+
+  /* ----------------------------------------------------------
+     LOCATION ACTIVE STYLE
+  ---------------------------------------------------------- */
+
+  aside:has(
+    + main .medical-assistant-page
+  )
+  button[class*="F0E3D2"] svg {
+
+    color:
+      #087A32 !important;
+
+  }
+
+}
+
+
+/* ============================================================
+   MEDICAL ASSISTANT PAGE CONTAINER
+============================================================ */
+
+/*
+  UserPortal's PageContainer adds 32px top padding.
+  The reference begins around 25px from the top.
+*/
+
+.medical-assistant-page {
+
+  margin-top:
+    -7px;
+
+}
+
+
+/* ============================================================
+   MEDICAL ASSISTANT SCROLLBAR
+============================================================ */
+
+.medical-assistant-page {
+
+  scrollbar-width:
+    thin;
+
+  scrollbar-color:
+    #C8DDD0
+    transparent;
+
+}
+
+
+.medical-assistant-page::-webkit-scrollbar {
+
+  width:
+    6px;
+
+}
+
+
+.medical-assistant-page::-webkit-scrollbar-track {
+
+  background:
+    transparent;
+
+}
+
+
+.medical-assistant-page::-webkit-scrollbar-thumb {
+
+  background:
+    #C8DDD0;
+
+  border-radius:
+    999px;
+
+}
+
+
+/* ============================================================
+   TEXTAREA
+============================================================ */
+
+.medical-assistant-page textarea {
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+}
+
+
+/* ============================================================
+   FOCUS
+============================================================ */
+
+.medical-assistant-page button:focus-visible {
+
+  outline:
+    2px solid
+    rgba(38, 155, 90, 0.25);
+
+  outline-offset:
+    2px;
+
+}
+
+
+/* ============================================================
+   DESKTOP WIDTH CONTROL
+============================================================ */
+
+@media (min-width: 1024px) {
+
+  .medical-assistant-page {
+
+    width:
+      100%;
+
+    max-width:
+      100%;
+
+  }
+
+}
+
+
+/* ============================================================
+   TABLET
+============================================================ */
+
+@media (max-width: 1100px) {
+
+  .medical-assistant-page {
+
+    padding-left:
+      0;
+
+    padding-right:
+      0;
+
+  }
+
+}
+
+
+/* ============================================================
+   MOBILE
+============================================================ */
+
+@media (max-width: 900px) {
+
+  .medical-assistant-page
+  > .grid {
+
+    grid-template-columns:
+      1fr;
+
+  }
+
+
+  .medical-assistant-page
+  .grid-cols-\[minmax\(0\2c_1fr\)_290px\] {
+
+    grid-template-columns:
+      1fr;
+
+  }
+
+}
+
+
+@media (max-width: 700px) {
+
+  .medical-assistant-page {
+
+    margin-top:
+      0;
+
+  }
+
+
+  .medical-assistant-page
+  section:first-child {
+
+    height:
+      auto;
+
+    min-height:
+      330px;
+
+  }
+
+}
+
+
+@media (max-width: 560px) {
+
+  .medical-assistant-page {
+
+    overflow-x:
+      hidden;
+
+  }
+
+
+  .medical-assistant-page
+  section:first-child {
+
+    min-height:
+      390px;
+
+  }
+
+
+  .medical-assistant-page
+  section:first-child
+  > div {
+
+    transform:
+      scale(0.92);
+
+    transform-origin:
+      top left;
+
   }
 
 }
