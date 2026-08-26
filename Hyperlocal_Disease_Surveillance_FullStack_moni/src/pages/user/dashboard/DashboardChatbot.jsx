@@ -27,13 +27,23 @@ function FormattedResponse({
     return null;
   }
 
+
   const lines =
     String(text)
-      .replace(/\r\n/g, "\n")
+      .replace(
+        /\r\n/g,
+        "\n"
+      )
       .split("\n");
 
+
   return (
-    <div className="space-y-1">
+
+    <div
+      className="
+        space-y-[3px]
+      "
+    >
 
       {lines.map(
         (
@@ -45,25 +55,27 @@ function FormattedResponse({
             rawLine.trim();
 
 
-          // --------------------------------------------------
-          // Empty line
-          // --------------------------------------------------
+          /*
+           * EMPTY LINE
+           */
 
           if (!line) {
 
             return (
               <div
                 key={index}
-                className="h-1"
+                className="
+                  h-[2px]
+                "
               />
             );
 
           }
 
 
-          // --------------------------------------------------
-          // Horizontal separator
-          // --------------------------------------------------
+          /*
+           * HORIZONTAL SEPARATOR
+           */
 
           if (
             /^[-*_]{3,}$/.test(
@@ -75,7 +87,7 @@ function FormattedResponse({
               <div
                 key={index}
                 className="
-                  my-1.5
+                  my-1
                   border-t
                   border-[#DDE7DF]
                 "
@@ -85,9 +97,9 @@ function FormattedResponse({
           }
 
 
-          // --------------------------------------------------
-          // Remove markdown heading symbols
-          // --------------------------------------------------
+          /*
+           * REMOVE HEADING SYMBOLS
+           */
 
           const heading =
             line.replace(
@@ -96,14 +108,15 @@ function FormattedResponse({
             );
 
 
-          // --------------------------------------------------
-          // Bullet point
-          // --------------------------------------------------
+          /*
+           * BULLET
+           */
 
           const bullet =
             heading.match(
               /^[-*•]\s+(.*)$/
             );
+
 
           if (bullet) {
 
@@ -120,8 +133,8 @@ function FormattedResponse({
                 <span
                   className="
                     mt-[5px]
-                    h-1
-                    w-1
+                    h-[4px]
+                    w-[4px]
                     shrink-0
                     rounded-full
                     bg-[#3A9150]
@@ -142,14 +155,15 @@ function FormattedResponse({
           }
 
 
-          // --------------------------------------------------
-          // Numbered item
-          // --------------------------------------------------
+          /*
+           * NUMBERED ITEM
+           */
 
           const numbered =
             heading.match(
               /^(\d+)[.)]\s+(.*)$/
             );
+
 
           if (numbered) {
 
@@ -187,12 +201,14 @@ function FormattedResponse({
           }
 
 
-          // --------------------------------------------------
-          // Normal paragraph
-          // --------------------------------------------------
+          /*
+           * NORMAL PARAGRAPH
+           */
 
           return (
-            <p key={index}>
+            <p
+              key={index}
+            >
               {
                 formatInline(
                   heading
@@ -205,12 +221,14 @@ function FormattedResponse({
       )}
 
     </div>
+
   );
+
 }
 
 
 // ============================================================
-// FORMAT INLINE MARKDOWN
+// INLINE MARKDOWN
 // ============================================================
 
 function formatInline(
@@ -221,6 +239,7 @@ function formatInline(
     String(
       value || ""
     );
+
 
   const parts =
     text.split(
@@ -234,9 +253,9 @@ function formatInline(
       index
     ) => {
 
-      // ------------------------------------------------------
-      // Bold
-      // ------------------------------------------------------
+      /*
+       * BOLD
+       */
 
       if (
         part.startsWith(
@@ -267,9 +286,9 @@ function formatInline(
       }
 
 
-      // ------------------------------------------------------
-      // Italic
-      // ------------------------------------------------------
+      /*
+       * ITALIC
+       */
 
       if (
         part.startsWith(
@@ -281,7 +300,9 @@ function formatInline(
       ) {
 
         return (
-          <em key={index}>
+          <em
+            key={index}
+          >
             {
               part.slice(
                 1,
@@ -295,7 +316,9 @@ function formatInline(
 
 
       return (
-        <span key={index}>
+        <span
+          key={index}
+        >
           {part}
         </span>
       );
@@ -362,13 +385,11 @@ export default function DashboardChatbot({
 
 
     const userMessage = {
-
       role:
         "user",
 
       content:
         text,
-
     };
 
 
@@ -415,7 +436,9 @@ export default function DashboardChatbot({
         (
           current
         ) => [
+
           ...current,
+
           {
             role:
               "assistant",
@@ -423,6 +446,7 @@ export default function DashboardChatbot({
             content:
               assistantText,
           },
+
         ]
       );
 
@@ -434,7 +458,9 @@ export default function DashboardChatbot({
         (
           current
         ) => [
+
           ...current,
+
           {
             role:
               "assistant",
@@ -443,6 +469,7 @@ export default function DashboardChatbot({
               error?.message ||
               "I'm currently unable to connect to the medical assistant. Please try again shortly.",
           },
+
         ]
       );
 
@@ -461,9 +488,12 @@ export default function DashboardChatbot({
 
   const clearChat = () => {
 
-    if (loading) {
+    if (
+      loading
+    ) {
       return;
     }
+
 
     setMessages([]);
     setInput("");
@@ -490,7 +520,7 @@ export default function DashboardChatbot({
 
 
   // ==========================================================
-  // LATEST AI RESPONSE
+  // LATEST ASSISTANT MESSAGE
   // ==========================================================
 
   const latestAssistant =
@@ -506,7 +536,7 @@ export default function DashboardChatbot({
 
 
   // ==========================================================
-  // MAIN CHATBOT
+  // CHATBOT
   // ==========================================================
 
   return (
@@ -517,33 +547,33 @@ export default function DashboardChatbot({
         h-full
         min-h-0
         min-w-0
-        max-h-full
         flex-col
         overflow-hidden
         bg-white
       "
     >
 
-      {/* ======================================================
+      {/* =====================================================
           HEADER
-      ====================================================== */}
+      ===================================================== */}
 
       <div
         className="
           flex
-          h-[46px]
+          h-[45px]
           shrink-0
           items-center
           justify-between
           border-b
           border-[#EEE9E2]
-          px-4
+          px-[14px]
         "
       >
 
         <div
           className="
             flex
+            min-w-0
             items-center
             gap-2
           "
@@ -552,8 +582,9 @@ export default function DashboardChatbot({
           <div
             className="
               flex
-              h-7
-              w-7
+              h-[27px]
+              w-[27px]
+              shrink-0
               items-center
               justify-center
               rounded-full
@@ -563,7 +594,7 @@ export default function DashboardChatbot({
           >
 
             <Bot
-              size={16}
+              size={15}
               strokeWidth={1.8}
             />
 
@@ -572,6 +603,7 @@ export default function DashboardChatbot({
 
           <h2
             className="
+              truncate
               text-[12px]
               font-semibold
               uppercase
@@ -585,9 +617,7 @@ export default function DashboardChatbot({
         </div>
 
 
-        {/* ==================================================
-            CLEAR CHAT
-        ================================================== */}
+        {/* CLEAR */}
 
         <button
           type="button"
@@ -602,8 +632,8 @@ export default function DashboardChatbot({
           aria-label="Clear chat"
           className="
             flex
-            h-7
-            w-7
+            h-[27px]
+            w-[27px]
             shrink-0
             items-center
             justify-center
@@ -613,7 +643,7 @@ export default function DashboardChatbot({
             hover:bg-[#FFF1F1]
             hover:text-[#D32F2F]
             disabled:cursor-default
-            disabled:opacity-35
+            disabled:opacity-30
           "
         >
 
@@ -627,47 +657,43 @@ export default function DashboardChatbot({
       </div>
 
 
-      {/* ======================================================
-          CHAT BODY
-
-          IMPORTANT:
-          h-0 + flex-1 forces this area to stay inside the
-          available height instead of growing with content.
-      ====================================================== */}
+      {/* =====================================================
+          BODY
+      ===================================================== */}
 
       <div
         className="
           flex
           h-0
           min-h-0
-          min-w-0
           flex-1
           flex-col
           overflow-hidden
-          px-4
-          pb-3
-          pt-3
+          px-[14px]
+          pb-[8px]
+          pt-[9px]
         "
       >
 
-        {/* ==================================================
+        {/* ===================================================
             GREETING
-        ================================================== */}
+        =================================================== */}
 
         {messages.length === 0 && (
 
           <div
             className="
-              max-w-[250px]
+              h-[59px]
               shrink-0
+              overflow-hidden
               rounded-[9px]
               border
               border-[#DAD7D0]
               bg-[#FAFAF8]
-              px-3
-              py-2.5
+              px-[11px]
+              py-[8px]
               text-[10px]
-              leading-[1.55]
+              leading-[1.45]
               text-[#24282C]
             "
           >
@@ -691,97 +717,98 @@ export default function DashboardChatbot({
         )}
 
 
-        {/* ==================================================
+        {/* ===================================================
             QUICK QUESTIONS
-        ================================================== */}
+        =================================================== */}
 
         <div
           className={`
             shrink-0
-            space-y-2
-
             ${
-              messages.length
-                ? ""
-                : "mt-2.5"
+              messages.length === 0
+                ? "mt-[7px]"
+                : "mt-0"
             }
           `}
         >
 
-          {suggestions.map(
-            (
-              suggestion
-            ) => (
+          <div
+            className="
+              flex
+              flex-col
+              gap-[5px]
+            "
+          >
 
-              <button
-                key={
-                  suggestion
-                }
-                type="button"
-                onClick={() =>
-                  send(
+            {suggestions.map(
+              (
+                suggestion
+              ) => (
+
+                <button
+                  key={
                     suggestion
-                  )
-                }
-                disabled={
-                  loading
-                }
-                className="
-                  w-full
-                  rounded-[7px]
-                  border
-                  border-[#8CBF9A]
-                  bg-white
-                  px-3
-                  py-[7px]
-                  text-left
-                  text-[10px]
-                  font-medium
-                  leading-4
-                  text-[#347044]
-                  transition
-                  hover:bg-[#F3FAF4]
-                  disabled:cursor-default
-                  disabled:opacity-50
-                "
-              >
+                  }
+                  type="button"
+                  onClick={() =>
+                    send(
+                      suggestion
+                    )
+                  }
+                  disabled={
+                    loading
+                  }
+                  className="
+                    flex
+                    h-[34px]
+                    w-full
+                    shrink-0
+                    items-center
+                    overflow-hidden
+                    rounded-[7px]
+                    border
+                    border-[#8CBF9A]
+                    bg-white
+                    px-[11px]
+                    text-left
+                    text-[10px]
+                    font-medium
+                    leading-none
+                    text-[#347044]
+                    transition
+                    hover:bg-[#F3FAF4]
+                    disabled:cursor-default
+                    disabled:opacity-50
+                  "
+                >
 
-                {suggestion}
+                  <span className="
+                    truncate
+                  ">
+                    {suggestion}
+                  </span>
 
-              </button>
+                </button>
 
-            )
-          )}
+              )
+            )}
+
+          </div>
 
         </div>
 
 
-        {/* ==================================================
-            AI RESPONSE AREA
-
-            This is the ONLY element allowed to scroll.
-
-            h-0:
-            Prevents content from determining its height.
-
-            flex-1:
-            Takes all remaining available space.
-
-            min-h-0:
-            Allows the element to shrink below content size.
-
-            overflow-hidden:
-            Prevents content from escaping the box.
-        ================================================== */}
+        {/* ===================================================
+            RESPONSE AREA
+        =================================================== */}
 
         {latestAssistant && (
 
           <div
             className="
-              mt-2
+              mt-[7px]
               h-0
               min-h-0
-              min-w-0
               flex-1
               overflow-hidden
               rounded-[8px]
@@ -791,22 +818,17 @@ export default function DashboardChatbot({
             "
           >
 
-            {/* ----------------------------------------------
-                ONLY THIS ELEMENT SCROLLS
-            ---------------------------------------------- */}
-
             <div
               className="
                 h-full
                 min-h-0
-                min-w-0
                 overflow-x-hidden
                 overflow-y-auto
                 overscroll-contain
-                px-3
-                py-2.5
+                px-[10px]
+                py-[8px]
                 text-[9px]
-                leading-[1.55]
+                leading-[1.5]
                 text-[#3F4843]
 
                 [&::-webkit-scrollbar]:w-1.5
@@ -830,9 +852,28 @@ export default function DashboardChatbot({
         )}
 
 
-        {/* ==================================================
+        {/* ===================================================
+            SPACER
+
+            When there is no response, push input to the
+            bottom of the available chatbot card.
+        =================================================== */}
+
+        {!latestAssistant && (
+
+          <div
+            className="
+              min-h-[5px]
+              flex-1
+            "
+          />
+
+        )}
+
+
+        {/* ===================================================
             INPUT
-        ================================================== */}
+        =================================================== */}
 
         <form
           onSubmit={(
@@ -845,17 +886,17 @@ export default function DashboardChatbot({
 
           }}
           className="
-            mt-2.5
+            mt-[7px]
             flex
-            h-[43px]
+            h-[40px]
             shrink-0
             items-center
-            gap-2
+            gap-[6px]
             rounded-[9px]
             border
             border-[#DCD8D0]
             bg-white
-            p-1.5
+            p-[5px]
             shadow-[0_1px_2px_rgba(0,0,0,.03)]
           "
         >
@@ -874,18 +915,22 @@ export default function DashboardChatbot({
                 event.target.value
               )
             }
-            placeholder="Type your message..."
+            placeholder="
+              Type your message...
+            "
             className="
               min-w-0
               flex-1
               bg-transparent
-              px-2
+              px-[6px]
               text-[10px]
               text-[#20252A]
               outline-none
               placeholder:text-[#8C9296]
             "
-            aria-label="Chat message"
+            aria-label="
+              Chat message
+            "
           />
 
 
@@ -897,12 +942,12 @@ export default function DashboardChatbot({
             }
             className="
               flex
-              h-8
-              w-8
+              h-[29px]
+              w-[29px]
               shrink-0
               items-center
               justify-center
-              rounded-[8px]
+              rounded-[7px]
               bg-[#3A9150]
               text-white
               transition
@@ -910,13 +955,15 @@ export default function DashboardChatbot({
               disabled:cursor-default
               disabled:opacity-40
             "
-            aria-label="Send message"
+            aria-label="
+              Send message
+            "
           >
 
             {loading ? (
 
               <Loader2
-                size={15}
+                size={14}
                 className="
                   animate-spin
                 "
@@ -925,7 +972,8 @@ export default function DashboardChatbot({
             ) : (
 
               <Send
-                size={15}
+                size={14}
+                strokeWidth={2}
               />
 
             )}
@@ -935,16 +983,18 @@ export default function DashboardChatbot({
         </form>
 
 
-        {/* ==================================================
+        {/* ===================================================
             DISCLAIMER
-        ================================================== */}
+        =================================================== */}
 
         <p
           className="
-            mt-1.5
+            mt-[4px]
+            h-[10px]
             shrink-0
             text-center
             text-[8px]
+            leading-[10px]
             text-[#8B9094]
           "
         >

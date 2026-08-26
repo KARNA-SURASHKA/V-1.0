@@ -1,10 +1,7 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
+  ArrowRight,
   Bell,
   CalendarDays,
   ChevronDown,
@@ -12,42 +9,26 @@ import {
   ShieldCheck,
   TrendingUp,
   User,
-  ArrowRight,
 } from "lucide-react";
 
-import {
-  api,
-} from "../../api";
+import { api } from "../../api";
+import { getDiseaseVisual } from "../../data/diseaseVisuals";
+import HeroBg from "../../assets/hero-bg.png";
 
-import {
-  getDiseaseVisual,
-} from "../../data/diseaseVisuals";
+import TodaysUpdate from "./dashboard/TodaysUpdate";
+import RiskAroundYou from "./dashboard/RiskAroundYou";
+import PreventiveMeasures from "./dashboard/PreventiveMeasures";
+import QuickAccess from "./dashboard/QuickAccess";
+import DashboardChatbot from "./dashboard/DashboardChatbot.jsx";
 
-import HeroBg
-  from "../../assets/hero-bg.png";
+const RISK_ORDER = {
+  Low: 0,
+  Moderate: 1,
+  High: 2,
+  Critical: 3,
+};
 
-import TodaysUpdate
-  from "./dashboard/TodaysUpdate";
-
-import RiskAroundYou
-  from "./dashboard/RiskAroundYou";
-
-import PreventiveMeasures
-  from "./dashboard/PreventiveMeasures";
-
-import QuickAccess
-  from "./dashboard/QuickAccess";
-
-import DashboardChatbot
-  from "./dashboard/DashboardChatbot.jsx";
-
-
-// ============================================================
-// RISK COLORS
-// ============================================================
-
-const riskTone = {
-
+const RISK_TONE = {
   Low: {
     text: "#16803C",
     icon: "#E2F1E4",
@@ -67,83 +48,26 @@ const riskTone = {
     text: "#C62828",
     icon: "#F6D4D4",
   },
-
 };
 
+function normalizeRisk(value) {
+  const text = String(value || "Low").toLowerCase();
 
-// ============================================================
-// NORMALIZE RISK
-// ============================================================
-
-function normalizeRisk(
-  value
-) {
-
-  const text =
-    String(
-      value ||
-        "Low"
-    ).toLowerCase();
-
-
-  if (
-    text.includes(
-      "critical"
-    )
-  ) {
-    return "Critical";
-  }
-
-
-  if (
-    text.includes(
-      "high"
-    )
-  ) {
-    return "High";
-  }
-
-
-  if (
-    text.includes(
-      "moderate"
-    )
-  ) {
-    return "Moderate";
-  }
-
+  if (text.includes("critical")) return "Critical";
+  if (text.includes("high")) return "High";
+  if (text.includes("moderate")) return "Moderate";
 
   return "Low";
-
 }
 
-
-// ============================================================
-// LOCATION LABEL
-// ============================================================
-
-function locationLabel(
-  location
-) {
-
+function locationLabel(location) {
   if (!location) {
     return "Selected location";
   }
 
-
-  if (
-    location.talukName &&
-    location.districtName
-  ) {
-
-    return `${
-      location.talukName
-    }, ${
-      location.districtName
-    }`;
-
+  if (location.talukName && location.districtName) {
+    return `${location.talukName}, ${location.districtName}`;
   }
-
 
   return (
     location.talukName ||
@@ -151,13 +75,50 @@ function locationLabel(
     location.stateName ||
     "Selected location"
   );
-
 }
 
+function calculateWeeklyChange(data) {
+  if (
+    data?.trend_percentage !== undefined &&
+    data?.trend_percentage !== null
+  ) {
+    const value = Number(
+      String(data.trend_percentage).replace("%", "")
+    );
 
-// ============================================================
-// DASHBOARD
-// ============================================================
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const trend = Array.isArray(data?.trend)
+    ? data.trend
+    : [];
+
+  if (trend.length < 2) {
+    return null;
+  }
+
+  const previous = Number(
+    trend[trend.length - 2]?.total_cases ??
+      trend[trend.length - 2]?.totalCases ??
+      trend[trend.length - 2]?.cases ??
+      0
+  );
+
+  const current = Number(
+    trend[trend.length - 1]?.total_cases ??
+      trend[trend.length - 1]?.totalCases ??
+      trend[trend.length - 1]?.cases ??
+      0
+  );
+
+  if (!previous) {
+    return current ? 100 : 0;
+  }
+
+  return Math.round(
+    ((current - previous) / previous) * 100
+  );
+}
 
 export default function Dashboard({
   username,
@@ -168,316 +129,216 @@ export default function Dashboard({
   onNavigate,
   onExit,
 }) {
-
   const [
     profileOpen,
     setProfileOpen,
   ] = useState(false);
-
 
   const [
     alerts,
     setAlerts,
   ] = useState([]);
 
-
   const talukId =
     selectedLocation?.talukId;
 
-
-  // ==========================================================
-  // LOAD NOTIFICATIONS
-  // ==========================================================
+  /*
+   * ==========================================================
+   * LOAD NOTIFICATIONS
+   * ==========================================================
+   */
 
   useEffect(() => {
-
-    let cancelled =
-      false;
-
+    let cancelled = false;
 
     async function loadAlerts() {
-
       if (!talukId) {
-
         setAlerts([]);
-
         return;
-
       }
 
-
       try {
-
         const data =
           await api.getNotifications(
             Number(talukId)
           );
 
-
         if (!cancelled) {
-
           setAlerts(
-            Array.isArray(
-              data
-            )
+            Array.isArray(data)
               ? data
               : []
           );
-
         }
-
       } catch {
-
         if (!cancelled) {
-
           setAlerts([]);
-
         }
-
       }
-
     }
-
 
     loadAlerts();
 
-
     return () => {
-
       cancelled = true;
-
     };
+  }, [talukId]);
 
-  }, [
-    talukId,
-  ]);
+  /*
+   * ==========================================================
+   * DISEASE CARDS
+   * ==========================================================
+   */
 
+  const cards = useMemo(
+    () =>
+      Array.isArray(
+        dashboardData?.cards
+      )
+        ? dashboardData.cards
+        : [],
+    [dashboardData]
+  );
 
-  // ==========================================================
-  // DOMINANT DISEASE
-  // ==========================================================
+  /*
+   * ==========================================================
+   * LOCALITY RISK DISEASE
+   *
+   * IMPORTANT:
+   *
+   * There is NO hardcoded Dengue here.
+   *
+   * The disease displayed by the dashboard is selected from
+   * the disease cards returned for the currently selected
+   * Taluk.
+   *
+   * Priority:
+   *
+   * Critical
+   * High
+   * Moderate
+   * Low
+   *
+   * If two diseases have the same risk level, the disease
+   * having more cases wins.
+   * ==========================================================
+   */
 
-  const latestDisease =
-    dashboardData?.top_disease ||
-    dashboardData?.dominant_disease ||
-    dashboardData?.cards?.[0]?.disease ||
+  const riskDiseaseCard =
+    useMemo(() => {
+      if (!cards.length) {
+        return null;
+      }
+
+      return [...cards].sort(
+        (a, b) => {
+          const riskDifference =
+            (
+              RISK_ORDER[
+                normalizeRisk(
+                  b?.risk_level
+                )
+              ] ?? 0
+            ) -
+            (
+              RISK_ORDER[
+                normalizeRisk(
+                  a?.risk_level
+                )
+              ] ?? 0
+            );
+
+          if (
+            riskDifference !== 0
+          ) {
+            return riskDifference;
+          }
+
+          return (
+            Number(
+              b?.cases || 0
+            ) -
+            Number(
+              a?.cases || 0
+            )
+          );
+        }
+      )[0];
+    },
+    [cards]
+  );
+
+  const riskDisease =
+    riskDiseaseCard?.disease ||
     null;
 
-
-  // ==========================================================
-  // DISEASE CARD
-  // ==========================================================
-
-  const diseaseCard =
-    useMemo(
-      () => {
-
-        const cards =
-          Array.isArray(
-            dashboardData?.cards
-          )
-            ? dashboardData.cards
-            : [];
-
-
-        return cards.find(
-          (
-            item
-          ) =>
-            String(
-              item?.disease ||
-                ""
-            ).toLowerCase() ===
-            String(
-              latestDisease ||
-                ""
-            ).toLowerCase()
-        );
-
-      },
-      [
-        dashboardData,
-        latestDisease,
-      ]
-    );
-
-
-  // ==========================================================
-  // DISEASE CATEGORY
-  // ==========================================================
-
   const diseaseCategory =
-    diseaseCard?.category ||
-    dashboardData?.top_disease_category ||
+    riskDiseaseCard?.category ||
     dashboardData?.category ||
     null;
 
-
-  // ==========================================================
-  // DISEASE VISUAL
-  // ==========================================================
-
   const visual =
     getDiseaseVisual(
-      latestDisease,
+      riskDisease,
       diseaseCategory
     );
 
-
-  // ==========================================================
-  // TOTAL CASES
-  // ==========================================================
+  /*
+   * ==========================================================
+   * TOTAL CASES
+   * ==========================================================
+   */
 
   const totalCases =
     dashboardData?.active_cases ??
     dashboardData?.total_cases ??
     dashboardData?.totalCases ??
     dashboardData?.cases ??
-    (
-      dashboardData?.cards ||
-      []
-    ).reduce(
-      (
-        sum,
-        item
-      ) =>
+    cards.reduce(
+      (sum, item) =>
         sum +
         Number(
-          item?.cases ||
-            0
+          item?.cases || 0
         ),
       0
     );
 
-
-  // ==========================================================
-  // RISK
-  // ==========================================================
+  /*
+   * ==========================================================
+   * OVERALL LOCALITY RISK
+   * ==========================================================
+   */
 
   const risk =
     normalizeRisk(
       dashboardData?.overall_risk ||
-      dashboardData?.risk_level ||
-      dashboardData?.risk
+        dashboardData?.risk_level ||
+        dashboardData?.risk
     );
 
-
   const tone =
-    riskTone[risk];
+    RISK_TONE[risk];
 
-
-  // ==========================================================
-  // WEEKLY CHANGE
-  // ==========================================================
+  /*
+   * ==========================================================
+   * WEEKLY CHANGE
+   * ==========================================================
+   */
 
   const weeklyChange =
     useMemo(
-      () => {
-
-        if (
-          dashboardData?.trend_percentage !==
-            undefined &&
-          dashboardData?.trend_percentage !==
-            null
-        ) {
-
-          const value =
-            Number(
-              String(
-                dashboardData
-                  .trend_percentage
-              ).replace(
-                "%",
-                ""
-              )
-            );
-
-
-          return Number.isFinite(
-            value
-          )
-            ? value
-            : null;
-
-        }
-
-
-        const trend =
-          Array.isArray(
-            dashboardData?.trend
-          )
-            ? dashboardData.trend
-            : [];
-
-
-        if (
-          trend.length <
-          2
-        ) {
-          return null;
-        }
-
-
-        const previous =
-          Number(
-            trend[
-              trend.length - 2
-            ]?.total_cases ??
-            trend[
-              trend.length - 2
-            ]?.totalCases ??
-            trend[
-              trend.length - 2
-            ]?.cases ??
-            0
-          );
-
-
-        const current =
-          Number(
-            trend[
-              trend.length - 1
-            ]?.total_cases ??
-            trend[
-              trend.length - 1
-            ]?.totalCases ??
-            trend[
-              trend.length - 1
-            ]?.cases ??
-            0
-          );
-
-
-        if (!previous) {
-
-          return current
-            ? 100
-            : 0;
-
-        }
-
-
-        return Math.round(
-          (
-            (
-              current -
-              previous
-            ) /
-            previous
-          ) *
-            100
-        );
-
-      },
-      [
-        dashboardData,
-      ]
+      () =>
+        calculateWeeklyChange(
+          dashboardData
+        ),
+      [dashboardData]
     );
 
-
-  // ==========================================================
-  // DATE
-  // ==========================================================
+  /*
+   * ==========================================================
+   * DATE
+   * ==========================================================
+   */
 
   const today =
     new Date().toLocaleDateString(
@@ -489,10 +350,11 @@ export default function Dashboard({
       }
     );
 
-
-  // ==========================================================
-  // LAST UPDATED
-  // ==========================================================
+  /*
+   * ==========================================================
+   * LAST UPDATED
+   * ==========================================================
+   */
 
   const lastUpdated =
     dashboardData?.last_updated_at
@@ -501,263 +363,216 @@ export default function Dashboard({
         ).toLocaleTimeString(
           "en-IN",
           {
-            hour:
-              "2-digit",
-            minute:
-              "2-digit",
-            hour12:
-              true,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
           }
         )
       : null;
 
+  const trendLabel =
+    weeklyChange > 0
+      ? "Increasing"
+      : weeklyChange < 0
+        ? "Decreasing"
+        : "Stable";
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
+  /*
+   * ==========================================================
+   * LOADING
+   * ==========================================================
+   */
 
   if (loading) {
-
     return (
+      <div className="
+        min-h-screen
+        bg-white
+        px-8
+        py-8
+        lg:ml-[14px]
+      ">
+        <div className="
+          flex
+          min-h-[650px]
+          items-center
+          justify-center
+          rounded-[14px]
+          border
+          border-[#E7E7E2]
+          bg-white
+        ">
+          <div className="text-center">
+            <div className="
+              mx-auto
+              h-9
+              w-9
+              animate-spin
+              rounded-full
+              border-4
+              border-[#E8EEE9]
+              border-t-[#2E9649]
+            " />
 
-      <div
-        className="
-          min-h-screen
-          bg-[#F5F1E9]
-          p-8
-        "
-      >
-
-        <div
-          className="
-            flex
-            min-h-[600px]
-            items-center
-            justify-center
-            rounded-[14px]
-            border
-            border-[#E8E1D7]
-            bg-white
-          "
-        >
-
-          <div
-            className="
-              text-center
-            "
-          >
-
-            <div
-              className="
-                mx-auto
-                h-9
-                w-9
-                animate-spin
-                rounded-full
-                border-4
-                border-[#E7E0D5]
-                border-t-[#2E9649]
-              "
-            />
-
-            <p
-              className="
-                mt-4
-                text-[13px]
-                text-[#737A80]
-              "
-            >
+            <p className="
+              mt-4
+              text-[13px]
+              text-[#737A80]
+            ">
               Loading surveillance data...
             </p>
-
           </div>
-
         </div>
-
       </div>
-
     );
-
   }
 
-
-  // ==========================================================
-  // ERROR
-  // ==========================================================
+  /*
+   * ==========================================================
+   * ERROR
+   * ==========================================================
+   */
 
   if (error) {
-
     return (
-
-      <div
-        className="
-          min-h-screen
-          bg-[#F5F1E9]
-          p-8
-        "
-      >
-
-        <div
-          className="
-            rounded-[14px]
-            border
-            border-red-200
-            bg-red-50
-            px-6
-            py-5
-            text-[13px]
-            text-red-700
-          "
-        >
+      <div className="
+        min-h-screen
+        bg-white
+        px-8
+        py-8
+        lg:ml-[14px]
+      ">
+        <div className="
+          rounded-[14px]
+          border
+          border-red-200
+          bg-red-50
+          px-6
+          py-5
+          text-[13px]
+          text-red-700
+        ">
           {error}
         </div>
-
       </div>
-
     );
-
   }
 
-
-  // ==========================================================
-  // MAIN
-  // ==========================================================
+  /*
+   * ==========================================================
+   * DASHBOARD
+   * ==========================================================
+   */
 
   return (
+    <div className="
+      ml-0
+      min-h-screen
+      bg-white
+      text-[#17191C]
+      lg:ml-[14px]
+    ">
 
-    <div
-      className="
-        min-h-screen
-        bg-[#F5F1E9]
-        text-[#17191C]
-      "
-    >
-
-      {/* ======================================================
+      {/* =====================================================
           HEADER
-      ====================================================== */}
+      ===================================================== */}
 
-      <header
-        className="
-          relative
-          h-[178px]
-          overflow-hidden
-          border-b
-          border-[#E8E1D7]
-          bg-[#F8F5EF]
-        "
-      >
+      <header className="
+        relative
+        h-[178px]
+        overflow-hidden
+        border-b
+        border-[#ECEBE7]
+        bg-white
+      ">
 
         <img
-          src={
-            HeroBg
-          }
+          src={HeroBg}
           alt=""
           aria-hidden="true"
+          draggable="false"
           className="
             pointer-events-none
             absolute
-            bottom-[-38px]
-            right-[-10px]
-            h-[235px]
-            w-[920px]
-            max-w-[67vw]
+            bottom-[-35px]
+            right-[-5px]
+            h-[228px]
+            w-[720px]
             object-cover
             object-center
-            opacity-[0.72]
+            opacity-[0.62]
           "
         />
 
+        <div className="
+          relative
+          z-10
+          flex
+          h-full
+          items-start
+          justify-between
+          px-8
+          pt-[30px]
+          xl:px-9
+        ">
 
-        <div
-          className="
-            relative
-            z-10
-            flex
-            h-full
-            items-start
-            justify-between
-            px-8
-            pt-7
-            xl:px-9
-          "
-        >
-
-          {/* GREETING */}
+          {/* =================================================
+              GREETING
+          ================================================= */}
 
           <div>
 
-            <div
-              className="
-                flex
-                items-center
-                gap-2
-              "
-            >
+            <div className="
+              flex
+              items-center
+              gap-2
+            ">
 
-              <h1
-                className="
-                  text-[26px]
-                  font-semibold
-                  leading-none
-                  tracking-[-0.035em]
-                  text-[#111315]
-                "
-              >
-                Good Afternoon,
-                {" "}
-                {username}
+              <h1 className="
+                text-[27px]
+                font-semibold
+                leading-none
+                tracking-[-0.035em]
+                text-[#111315]
+              ">
+                Good Afternoon, {username}
               </h1>
 
-              <span
-                className="
-                  text-[22px]
-                "
-              >
+              <span className="text-[22px]">
                 👋
               </span>
 
             </div>
 
 
-            <div
-              className="
-                mt-3
-                flex
-                items-center
-                gap-2
-              "
-            >
+            <div className="
+              mt-[18px]
+              flex
+              items-center
+              gap-2
+            ">
 
-              <span
-                className="
-                  text-[12px]
-                  text-[#20252A]
-                "
-              >
-                Monitoring disease
-                situation for
+              <span className="
+                text-[12px]
+                text-[#20252A]
+              ">
+                Monitoring disease situation for
               </span>
 
+              <span className="
+                inline-flex
+                items-center
+                gap-1.5
+                rounded-full
+                bg-[#EAF5EC]
+                px-3
+                py-[7px]
+                text-[12px]
+                font-medium
+                text-[#16803C]
+              ">
 
-              <span
-                className="
-                  inline-flex
-                  items-center
-                  gap-1.5
-                  rounded-full
-                  bg-[#E9F5EA]
-                  px-3
-                  py-[7px]
-                  text-[12px]
-                  font-medium
-                  text-[#16803C]
-                "
-              >
-
-                <MapPin
-                  size={13}
-                />
+                <MapPin size={13} />
 
                 {
                   locationLabel(
@@ -770,36 +585,28 @@ export default function Dashboard({
             </div>
 
 
-            <div
-              className="
-                mt-2.5
-                flex
-                items-center
-                gap-1.5
-                text-[10px]
-                text-[#687078]
-              "
-            >
+            <div className="
+              mt-[20px]
+              flex
+              items-center
+              gap-1.5
+              text-[11px]
+              text-[#687078]
+            ">
 
-              <span
-                className="
-                  text-[13px]
-                "
-              >
+              <span className="
+                text-[15px]
+              ">
                 ◷
               </span>
 
               <span>
-
-                Last Updated:
-                {" "}
-
+                Last updated:{" "}
                 {
                   lastUpdated
                     ? `Today • ${lastUpdated}`
                     : "Live surveillance"
                 }
-
               </span>
 
             </div>
@@ -807,15 +614,15 @@ export default function Dashboard({
           </div>
 
 
-          {/* HEADER CONTROLS */}
+          {/* =================================================
+              HEADER CONTROLS
+          ================================================= */}
 
-          <div
-            className="
-              flex
-              items-start
-              gap-3
-            "
-          >
+          <div className="
+            flex
+            items-start
+            gap-3
+          ">
 
             {/* NOTIFICATIONS */}
 
@@ -829,42 +636,39 @@ export default function Dashboard({
               className="
                 relative
                 flex
-                h-11
-                w-11
+                h-[45px]
+                w-[45px]
                 items-center
                 justify-center
-                rounded-[10px]
+                rounded-[11px]
                 border
-                border-[#E4DED4]
+                border-[#E3E2DE]
                 bg-white
               "
               aria-label="Notifications"
             >
 
               <Bell
-                size={19}
+                size={21}
                 strokeWidth={1.8}
               />
 
-
-              <span
-                className="
-                  absolute
-                  -right-1
-                  -top-1
-                  flex
-                  h-5
-                  min-w-5
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-[#E3262E]
-                  px-1
-                  text-[10px]
-                  font-semibold
-                  text-white
-                "
-              >
+              <span className="
+                absolute
+                -right-1
+                -top-1
+                flex
+                h-6
+                min-w-6
+                items-center
+                justify-center
+                rounded-full
+                bg-[#E3262E]
+                px-1
+                text-[10px]
+                font-semibold
+                text-white
+              ">
                 {
                   Math.min(
                     Math.max(
@@ -885,31 +689,30 @@ export default function Dashboard({
               type="button"
               className="
                 hidden
-                h-11
+                h-[45px]
                 items-center
                 gap-2
-                rounded-[10px]
+                rounded-[11px]
                 border
-                border-[#E4DED4]
+                border-[#E3E2DE]
                 bg-white
-                px-3.5
+                px-4
                 md:flex
               "
+              aria-label="Selected location"
             >
 
               <MapPin
-                size={17}
+                size={19}
                 strokeWidth={1.8}
               />
 
-              <span
-                className="
-                  max-w-[175px]
-                  truncate
-                  text-[12px]
-                  font-medium
-                "
-              >
+              <span className="
+                max-w-[150px]
+                truncate
+                text-[12px]
+                font-medium
+              ">
                 {
                   locationLabel(
                     selectedLocation
@@ -918,7 +721,7 @@ export default function Dashboard({
               </span>
 
               <ChevronDown
-                size={15}
+                size={16}
               />
 
             </button>
@@ -926,38 +729,34 @@ export default function Dashboard({
 
             {/* DATE */}
 
-            <div
-              className="
-                hidden
-                h-11
-                items-center
-                gap-2
-                rounded-[10px]
-                border
-                border-[#E4DED4]
-                bg-white
-                px-3.5
-                lg:flex
-              "
-            >
+            <div className="
+              hidden
+              h-[45px]
+              items-center
+              gap-2
+              rounded-[11px]
+              border
+              border-[#E3E2DE]
+              bg-white
+              px-4
+              lg:flex
+            ">
 
               <CalendarDays
-                size={17}
+                size={19}
                 strokeWidth={1.8}
               />
 
-              <span
-                className="
-                  whitespace-nowrap
-                  text-[12px]
-                  font-medium
-                "
-              >
+              <span className="
+                whitespace-nowrap
+                text-[12px]
+                font-medium
+              ">
                 {today}
               </span>
 
               <ChevronDown
-                size={15}
+                size={16}
               />
 
             </div>
@@ -965,11 +764,7 @@ export default function Dashboard({
 
             {/* PROFILE */}
 
-            <div
-              className="
-                relative
-              "
-            >
+            <div className="relative">
 
               <button
                 type="button"
@@ -981,65 +776,52 @@ export default function Dashboard({
                 }
                 className="
                   flex
+                  h-[45px]
                   items-center
                   gap-2
-                  rounded-[10px]
-                  px-1
-                  py-1
-                  hover:bg-white/70
+                  rounded-[11px]
+                  px-1.5
+                  hover:bg-[#F7F8F6]
                 "
+                aria-label="User profile"
               >
 
-                <span
-                  className="
-                    flex
-                    h-10
-                    w-10
-                    items-center
-                    justify-center
-                    rounded-full
-                    bg-[#EFE5D7]
-                    text-[#8B7258]
-                  "
-                >
-
-                  <User
-                    size={18}
-                  />
-
+                <span className="
+                  flex
+                  h-10
+                  w-10
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-[#F0E8DC]
+                  text-[#8B7258]
+                ">
+                  <User size={19} />
                 </span>
 
+                <span className="
+                  hidden
+                  text-left
+                  sm:block
+                ">
 
-                <span
-                  className="
-                    hidden
-                    text-left
-                    sm:block
-                  "
-                >
-
-                  <span
-                    className="
-                      block
-                      text-[12px]
-                      font-semibold
-                    "
-                  >
+                  <span className="
+                    block
+                    text-[12px]
+                    font-semibold
+                  ">
                     {username}
                   </span>
 
-                  <span
-                    className="
-                      block
-                      text-[10px]
-                      text-[#626970]
-                    "
-                  >
+                  <span className="
+                    block
+                    text-[10px]
+                    text-[#626970]
+                  ">
                     User
                   </span>
 
                 </span>
-
 
                 <ChevronDown
                   size={15}
@@ -1049,56 +831,44 @@ export default function Dashboard({
 
 
               {profileOpen && (
+                <div className="
+                  absolute
+                  right-0
+                  top-[50px]
+                  z-50
+                  w-48
+                  rounded-xl
+                  border
+                  border-[#E5DED3]
+                  bg-white
+                  p-2
+                  shadow-xl
+                ">
 
-                <div
-                  className="
-                    absolute
-                    right-0
-                    top-[48px]
-                    z-50
-                    w-48
-                    rounded-xl
-                    border
-                    border-[#E5DED3]
-                    bg-white
-                    p-2
-                    shadow-xl
-                  "
-                >
+                  <div className="
+                    px-3
+                    py-2
+                  ">
 
-                  <div
-                    className="
-                      px-3
-                      py-2
-                    "
-                  >
-
-                    <p
-                      className="
-                        text-[12px]
-                        font-semibold
-                      "
-                    >
+                    <p className="
+                      text-[12px]
+                      font-semibold
+                    ">
                       {username}
                     </p>
 
-                    <p
-                      className="
-                        text-[10px]
-                        text-[#737A80]
-                      "
-                    >
+                    <p className="
+                      text-[10px]
+                      text-[#737A80]
+                    ">
                       User
                     </p>
 
                   </div>
 
-
                   <button
                     type="button"
-                    onClick={
-                      onExit
-                    }
+                    onClick={onExit}
                     className="
                       w-full
                       rounded-lg
@@ -1114,7 +884,6 @@ export default function Dashboard({
                   </button>
 
                 </div>
-
               )}
 
             </div>
@@ -1126,79 +895,71 @@ export default function Dashboard({
       </header>
 
 
-      {/* ======================================================
-          MAIN DASHBOARD
-      ====================================================== */}
+      {/* =====================================================
+          MAIN CONTENT
+      ===================================================== */}
 
-      <main
-        className="
-          px-7
-          py-5
-          xl:px-8
-        "
-      >
+      <main className="
+        px-8
+        py-[18px]
+        xl:px-8
+      ">
 
-        <div
-          className="
-            mx-auto
-            max-w-[1515px]
-          "
-        >
+        <div className="
+          mx-auto
+          max-w-[1515px]
+        ">
 
-          {/* ==================================================
+          {/* =================================================
               CURRENT HEALTH SITUATION
-          ================================================== */}
+          ================================================= */}
 
-          <section
-            className="
-              rounded-[14px]
-              border
-              border-[#E6DFD4]
-              bg-white
-              px-6
-              py-5
-              shadow-[0_1px_4px_rgba(44,35,24,0.035)]
-            "
-          >
+          <section className="
+            h-[181px]
+            rounded-[14px]
+            border
+            border-[#E5E2DC]
+            bg-white
+            px-[22px]
+            py-[16px]
+            shadow-[0_1px_5px_rgba(44,35,24,0.035)]
+          ">
 
-            <p
-              className="
-                text-[11px]
-                font-semibold
-                uppercase
-                tracking-[0.17em]
-                text-[#58493F]
-              "
-            >
+            <p className="
+              text-[11px]
+              font-semibold
+              uppercase
+              tracking-[0.02em]
+              text-[#263D57]
+            ">
               CURRENT HEALTH SITUATION
             </p>
 
 
-            <div
-              className="
-                mt-4
-                grid
-                grid-cols-1
-                md:grid-cols-2
-                xl:grid-cols-[1.32fr_0.88fr_1fr_0.88fr]
-              "
-            >
+            <div className="
+              mt-[11px]
+              grid
+              h-[125px]
+              grid-cols-1
+              md:grid-cols-2
+              xl:grid-cols-[0.82fr_0.65fr_0.82fr_0.65fr]
+            ">
 
-              {/* RISK */}
+              {/* =================================================
+                  RISK
+              ================================================= */}
 
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-4
-                  border-b
-                  border-[#EEE9E1]
-                  py-2
-                  xl:border-b-0
-                  xl:border-r
-                  xl:pr-7
-                "
-              >
+              <div className="
+                flex
+                items-center
+                gap-4
+                border-b
+                border-[#EEE9E1]
+                py-2
+                xl:border-b-0
+                xl:border-r
+                xl:pr-7
+              ">
 
                 <div
                   className="
@@ -1244,25 +1005,22 @@ export default function Dashboard({
                     {risk} Risk
                   </p>
 
-
-                  <p
-                    className="
-                      mt-2
-                      max-w-[250px]
-                      text-[11px]
-                      leading-5
-                      text-[#353B40]
-                    "
-                  >
+                  <p className="
+                    mt-2
+                    max-w-[250px]
+                    text-[11px]
+                    leading-5
+                    text-[#353B40]
+                  ">
                     Disease activity is{" "}
                     {
-                      risk ===
-                      "Low"
+                      risk === "Low"
                         ? "low"
                         : "elevated"
                     }{" "}
-                    in your monitored
-                    area. Stay cautious.
+                    in your monitored area.
+                    <br />
+                    Stay cautious.
                   </p>
 
                 </div>
@@ -1270,59 +1028,49 @@ export default function Dashboard({
               </div>
 
 
-              {/* ACTIVE CASES */}
+              {/* =================================================
+                  ACTIVE CASES
+              ================================================= */}
 
-              <div
-                className="
-                  border-b
-                  border-[#EEE9E1]
-                  py-4
-                  md:pl-7
-                  xl:border-b-0
-                  xl:border-r
-                  xl:py-2
-                "
-              >
+              <div className="
+                border-b
+                border-[#EEE9E1]
+                py-3
+                md:pl-7
+                xl:border-b-0
+                xl:border-r
+                xl:py-2
+              ">
 
-                <p
-                  className="
-                    text-[27px]
-                    font-medium
-                    leading-none
-                  "
-                >
+                <p className="
+                  text-[28px]
+                  font-medium
+                  leading-none
+                ">
                   {
                     Number(
-                      totalCases ||
-                        0
+                      totalCases || 0
                     ).toLocaleString(
                       "en-IN"
                     )
                   }
                 </p>
 
-
-                <p
-                  className="
-                    mt-2
-                    text-[12px]
-                    font-medium
-                  "
-                >
+                <p className="
+                  mt-2
+                  text-[12px]
+                  font-semibold
+                ">
                   Active Cases
                 </p>
 
-
-                <p
-                  className="
-                    mt-1
-                    text-[10px]
-                    text-[#626970]
-                  "
-                >
+                <p className="
+                  mt-1
+                  text-[10px]
+                  text-[#626970]
+                ">
                   Total Reported
                 </p>
-
 
                 <p
                   className={`
@@ -1330,11 +1078,9 @@ export default function Dashboard({
                     text-[10px]
                     font-medium
                     ${
-                      weeklyChange >
-                      0
+                      weeklyChange > 0
                         ? "text-[#F04444]"
-                        : weeklyChange <
-                            0
+                        : weeklyChange < 0
                           ? "text-[#16803C]"
                           : "text-[#737A80]"
                     }
@@ -1342,14 +1088,10 @@ export default function Dashboard({
                 >
 
                   {
-                    weeklyChange ===
-                    null
-
+                    weeklyChange === null
                       ? "No trend data"
-
                       : `${
-                          weeklyChange >=
-                          0
+                          weeklyChange >= 0
                             ? "↗"
                             : "↘"
                         } ${
@@ -1364,50 +1106,47 @@ export default function Dashboard({
               </div>
 
 
-              {/* DISEASE */}
+              {/* =================================================
+                  HIGHEST-RISK DISEASE
+              ================================================= */}
 
-              <div
-                className="
-                  border-b
-                  border-[#EEE9E1]
-                  py-4
-                  md:pl-7
-                  xl:border-b-0
-                  xl:border-r
-                  xl:py-2
-                "
-              >
+              <div className="
+                border-b
+                border-[#EEE9E1]
+                py-3
+                md:pl-7
+                xl:border-b-0
+                xl:border-r
+                xl:py-2
+              ">
 
-                <div
-                  className="
+                <div className="
+                  flex
+                  items-center
+                  gap-4
+                ">
+
+                  <div className="
                     flex
+                    h-[68px]
+                    w-[68px]
+                    shrink-0
                     items-center
-                    gap-4
-                  "
-                >
-
-                  <div
-                    className="
-                      flex
-                      h-[68px]
-                      w-[68px]
-                      shrink-0
-                      items-center
-                      justify-center
-                      overflow-hidden
-                      rounded-full
-                      bg-[#EFF7F0]
-                    "
-                  >
+                    justify-center
+                    overflow-hidden
+                    rounded-[18px]
+                    bg-[#EFF7F0]
+                  ">
 
                     <img
                       src={
                         visual.diseaseImage
                       }
                       alt=""
+                      draggable="false"
                       className="
-                        h-[55px]
-                        w-[55px]
+                        h-[58px]
+                        w-[58px]
                         object-contain
                       "
                     />
@@ -1415,41 +1154,37 @@ export default function Dashboard({
                   </div>
 
 
-                  <div>
+                  <div className="min-w-0">
 
-                    <p
-                      className="
-                        text-[22px]
-                        font-semibold
-                        leading-none
-                      "
-                    >
-                      {visual.name}
-                    </p>
-
-
-                    <p
-                      className="
-                        mt-2
-                        text-[10px]
-                        text-[#626970]
-                      "
-                    >
-                      Dominant Disease
-                    </p>
-
-
-                    <p
-                      className="
-                        mt-2
-                        text-[10px]
-                        font-semibold
-                        text-[#16803C]
-                      "
-                    >
+                    <p className="
+                      truncate
+                      text-[22px]
+                      font-semibold
+                      leading-none
+                    ">
                       {
-                        diseaseCard
-                          ? `${diseaseCard.cases} cases`
+                        riskDisease ||
+                        "No active disease"
+                      }
+                    </p>
+
+                    <p className="
+                      mt-2
+                      text-[10px]
+                      text-[#626970]
+                    ">
+                      Highest Locality Risk
+                    </p>
+
+                    <p className="
+                      mt-2
+                      text-[10px]
+                      font-semibold
+                      text-[#16803C]
+                    ">
+                      {
+                        riskDiseaseCard
+                          ? `${riskDiseaseCard.cases} cases`
                           : "No cases"
                       }
                     </p>
@@ -1461,36 +1196,32 @@ export default function Dashboard({
               </div>
 
 
-              {/* TREND */}
+              {/* =================================================
+                  WEEKLY TREND
+              ================================================= */}
 
-              <div
-                className="
-                  py-4
-                  md:pl-7
-                  xl:py-2
-                "
-              >
+              <div className="
+                py-3
+                md:pl-7
+                xl:py-2
+              ">
 
-                <div
-                  className="
+                <div className="
+                  flex
+                  items-center
+                  gap-4
+                ">
+
+                  <div className="
                     flex
+                    h-[68px]
+                    w-[68px]
+                    shrink-0
                     items-center
-                    gap-4
-                  "
-                >
-
-                  <div
-                    className="
-                      flex
-                      h-[68px]
-                      w-[68px]
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-full
-                      bg-[#EDF4FD]
-                    "
-                  >
+                    justify-center
+                    rounded-full
+                    bg-[#EDF4FD]
+                  ">
 
                     <TrendingUp
                       size={29}
@@ -1505,20 +1236,16 @@ export default function Dashboard({
 
                   <div>
 
-                    <p
-                      className="
-                        text-[24px]
-                        font-semibold
-                        leading-none
-                      "
-                    >
+                    <p className="
+                      text-[24px]
+                      font-semibold
+                      leading-none
+                    ">
                       {
-                        weeklyChange ===
-                        null
+                        weeklyChange === null
                           ? "—"
                           : `${
-                              weeklyChange >=
-                              0
+                              weeklyChange >= 0
                                 ? "+"
                                 : ""
                             }${
@@ -1527,51 +1254,34 @@ export default function Dashboard({
                       }
                     </p>
 
-
-                    <p
-                      className="
-                        mt-2
-                        text-[10px]
-                        text-[#626970]
-                      "
-                    >
+                    <p className="
+                      mt-2
+                      text-[10px]
+                      text-[#626970]
+                    ">
                       Weekly Trend
                     </p>
 
-
-                    <p
-                      className="
-                        mt-1
-                        text-[10px]
-                        text-[#626970]
-                      "
-                    >
+                    <p className="
+                      mt-1
+                      text-[10px]
+                      text-[#626970]
+                    ">
                       vs Last Week
                     </p>
 
-
-                    <span
-                      className="
-                        mt-2
-                        inline-flex
-                        rounded-[6px]
-                        bg-[#EDF4FD]
-                        px-3
-                        py-1
-                        text-[9px]
-                        font-medium
-                        text-[#1769D2]
-                      "
-                    >
-                      {
-                        weeklyChange >
-                        0
-                          ? "Increasing"
-                          : weeklyChange <
-                              0
-                            ? "Decreasing"
-                            : "Stable"
-                      }
+                    <span className="
+                      mt-2
+                      inline-flex
+                      rounded-[6px]
+                      bg-[#EDF4FD]
+                      px-3
+                      py-1
+                      text-[9px]
+                      font-medium
+                      text-[#1769D2]
+                    ">
+                      {trendLabel}
                     </span>
 
                   </div>
@@ -1585,151 +1295,109 @@ export default function Dashboard({
           </section>
 
 
-          {/* ==================================================
-              MAIN THREE COLUMN ROW
+          {/* =================================================
+              THREE MAIN CARDS
+          ================================================= */}
 
-              IMPORTANT FIX:
-              - Fixed desktop row height
-              - min-h-0 prevents intrinsic content from
-                forcing the grid row to grow
-              - overflow-hidden keeps children inside
-          ================================================== */}
+          <section className="
+            mt-[14px]
+            grid
+            min-h-0
+            grid-cols-1
+            gap-[14px]
+            xl:h-[312px]
+            xl:grid-cols-[0.79fr_0.94fr_1fr]
+            xl:grid-rows-[312px]
+          ">
 
-          <section
-            className="
-              mt-4
-              grid
+            {/* WEEK'S UPDATE */}
+
+            <div className="
               min-h-0
-              grid-cols-1
-              gap-4
-              xl:h-[520px]
-              xl:min-h-[520px]
-              xl:max-h-[520px]
-              xl:grid-cols-[1.04fr_1.08fr_1fr]
-              xl:grid-rows-[520px]
-            "
-          >
-
-            {/* =================================================
-                WEEK'S UPDATE
-            ================================================= */}
-
-            <div
-              className="
-                min-h-0
-                h-full
-                overflow-hidden
-              "
-            >
+              h-full
+              overflow-hidden
+            ">
 
               <TodaysUpdate
-
                 disease={
-                  latestDisease
+                  riskDisease
                 }
-
                 category={
                   diseaseCategory
                 }
-
                 location={
                   selectedLocation?.talukName ||
                   selectedLocation?.districtName
                 }
-
                 trend={
-                  weeklyChange >
-                  0
+                  weeklyChange > 0
                     ? "increasing"
-                    : weeklyChange <
-                        0
+                    : weeklyChange < 0
                       ? "decreasing"
                       : "stable"
                 }
-
                 percentageChange={
                   weeklyChange
                 }
-
                 onViewDetails={() =>
                   onNavigate?.(
                     "analytics"
                   )
                 }
-
               />
 
             </div>
 
 
-            {/* =================================================
-                RISK AROUND YOU
-            ================================================= */}
+            {/* RISK AROUND YOU */}
 
-            <div
-              className="
-                min-h-0
-                h-full
-                overflow-hidden
-              "
-            >
+            <div className="
+              min-h-0
+              h-full
+              overflow-hidden
+            ">
 
               <RiskAroundYou
-
                 taluk={
                   selectedLocation
                 }
-
                 risk={
                   risk
                 }
-
                 onViewMap={() =>
                   onNavigate?.(
                     "risk-map"
                   )
                 }
-
               />
 
             </div>
 
 
-            {/* =================================================
-                AI HEALTH ASSISTANT
+            {/* AI HEALTH ASSISTANT */}
 
-                THIS CARD NOW HAS A REAL HEIGHT CONSTRAINT.
-                A LONG RESPONSE MUST SCROLL INSIDE IT.
-            ================================================= */}
-
-            <section
-              className="
-                min-h-0
-                h-full
-                max-h-full
-                overflow-hidden
-                rounded-[14px]
-                border
-                border-[#E6DFD4]
-                bg-white
-                shadow-[0_1px_4px_rgba(44,35,24,0.035)]
-              "
-            >
+            <section className="
+              min-h-0
+              h-full
+              max-h-full
+              overflow-hidden
+              rounded-[14px]
+              border
+              border-[#E5E2DC]
+              bg-white
+              shadow-[0_1px_5px_rgba(44,35,24,0.035)]
+            ">
 
               <DashboardChatbot
-
                 selectedLocation={
                   selectedLocation
                 }
-
                 username={
                   username
                 }
-
                 disease={
-                  visual.name
+                  riskDisease
                 }
-
               />
 
             </section>
@@ -1737,38 +1405,32 @@ export default function Dashboard({
           </section>
 
 
-          {/* ==================================================
+          {/* =================================================
               PRECAUTION + QUICK ACCESS
-          ================================================== */}
+          ================================================= */}
 
-          <section
-            className="
-              mt-4
-              grid
-              grid-cols-1
-              gap-4
-              xl:grid-cols-[2.12fr_1fr]
-            "
-          >
+          <section className="
+            mt-[14px]
+            grid
+            grid-cols-1
+            gap-[14px]
+            xl:h-[168px]
+            xl:grid-cols-[1.52fr_1fr]
+          ">
 
             <PreventiveMeasures
-
               disease={
-                latestDisease
+                riskDisease
               }
-
               category={
                 diseaseCategory
               }
-
               onMorePrecautions={() =>
                 onNavigate?.(
                   "precautions"
                 )
               }
-
             />
-
 
             <QuickAccess
               onNavigate={
@@ -1779,51 +1441,44 @@ export default function Dashboard({
           </section>
 
 
-          {/* ==================================================
-              FOOTER SAFETY BAR
-          ================================================== */}
+          {/* =================================================
+              SAFETY BAR
+          ================================================= */}
 
-          <div
-            className="
-              mt-4
+          <div className="
+            mt-[14px]
+            flex
+            min-h-[39px]
+            items-center
+            gap-3
+            rounded-[9px]
+            border
+            border-[#E5E2DC]
+            bg-white
+            px-4
+            text-[10px]
+            text-[#4E565C]
+          ">
+
+            <span className="
               flex
-              min-h-[39px]
+              h-5
+              w-5
               items-center
-              gap-3
-              rounded-[9px]
+              justify-center
+              rounded-full
               border
-              border-[#E6DFD4]
-              bg-white
-              px-4
-              text-[10px]
-              text-[#4E565C]
-            "
-          >
-
-            <span
-              className="
-                flex
-                h-5
-                w-5
-                items-center
-                justify-center
-                rounded-full
-                border
-                border-[#7A8084]
-                text-[11px]
-              "
-            >
+              border-[#7A8084]
+              text-[11px]
+            ">
               i
             </span>
 
-
             <span>
               Stay safe, stay informed.
-              Follow precautions and
-              protect yourself and your
-              loved ones.
+              Follow precautions and protect
+              yourself and your loved ones.
             </span>
-
 
             <button
               type="button"
@@ -1842,13 +1497,8 @@ export default function Dashboard({
                 hover:underline
               "
             >
-
               More
-
-              <ArrowRight
-                size={13}
-              />
-
+              <ArrowRight size={13} />
             </button>
 
           </div>
@@ -1858,7 +1508,5 @@ export default function Dashboard({
       </main>
 
     </div>
-
   );
-
 }

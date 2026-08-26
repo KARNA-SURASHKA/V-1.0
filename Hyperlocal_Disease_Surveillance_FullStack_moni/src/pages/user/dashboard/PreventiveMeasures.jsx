@@ -3,7 +3,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import DiseaseVisual from "../../../components/DiseaseVisual";
+import DiseaseVisual
+  from "../../../components/DiseaseVisual";
 
 import {
   getPreventionVisual,
@@ -24,94 +25,75 @@ export default function PreventiveMeasures({
 
 
   return (
-    <section
-      className="
+    <section className="
+      relative
+      h-full
+      overflow-hidden
+      rounded-[14px]
+      border
+      border-[#DDEBDD]
+      bg-[#F1F8F1]
+      px-[20px]
+      py-[15px]
+      shadow-[0_1px_5px_rgba(0,0,0,0.03)]
+    ">
+
+      {/* TEXT */}
+
+      <div className="
         relative
-        overflow-hidden
-        rounded-[14px]
-        border
-        border-[#E4E9E3]
-        bg-[#F3F8F2]
-        px-5
-        py-4
-        shadow-[0_1px_4px_rgba(0,0,0,0.03)]
-      "
-    >
+        z-10
+        max-w-[56%]
+      ">
 
-      {/* ======================================================
-          TEXT CONTENT
-      ====================================================== */}
-
-      <div
-        className="
-          relative
-          z-10
-          max-w-[58%]
-        "
-      >
-
-        {/* LABEL */}
-
-        <div
-          className="
-            flex
-            items-center
-            gap-2
-          "
-        >
+        <div className="
+          flex
+          items-center
+          gap-2
+        ">
 
           <ShieldCheck
             size={19}
-            className="text-[#16803C]"
-          />
-
-          <p
             className="
-              text-[13px]
-              font-semibold
-              uppercase
-              tracking-[0.03em]
               text-[#16803C]
             "
-          >
+          />
+
+          <p className="
+            text-[12px]
+            font-semibold
+            uppercase
+            tracking-[0.025em]
+            text-[#16803C]
+          ">
             PRECAUTION OF THE WEEK
           </p>
 
         </div>
 
 
-        {/* TITLE */}
-
-        <h2
-          className="
-            mt-4
-            max-w-[420px]
-            text-[20px]
-            font-semibold
-            leading-[1.25]
-            text-[#121617]
-          "
-        >
+        <h2 className="
+          mt-[11px]
+          max-w-[470px]
+          text-[18px]
+          font-semibold
+          leading-[1.25]
+          text-[#121617]
+        ">
           {visual.preventionTitle}
         </h2>
 
 
-        {/* DESCRIPTION */}
-
-        <p
-          className="
-            mt-2
-            max-w-[440px]
-            text-[14px]
-            leading-6
-            text-[#3E4840]
-          "
-        >
+        <p className="
+          mt-1
+          max-w-[480px]
+          text-[12px]
+          leading-[1.55]
+          text-[#3E4840]
+        ">
           {visual.preventionDescription}
         </p>
 
-
-        {/* MORE PRECAUTIONS */}
 
         <button
           type="button"
@@ -119,30 +101,27 @@ export default function PreventiveMeasures({
             onMorePrecautions
           }
           className="
-            mt-4
+            mt-[10px]
             inline-flex
             items-center
             gap-3
             rounded-[7px]
-            bg-[#2E9649]
-            px-5
-            py-2.5
-            text-[13px]
+            bg-[#169447]
+            px-[17px]
+            py-[8px]
+            text-[12px]
             font-medium
             text-white
             shadow-sm
             transition
             hover:bg-[#247E3B]
-            focus:outline-none
-            focus:ring-2
-            focus:ring-[#2E9649]/30
           "
         >
 
           More Precautions
 
           <ArrowRight
-            size={16}
+            size={15}
           />
 
         </button>
@@ -150,29 +129,24 @@ export default function PreventiveMeasures({
       </div>
 
 
-      {/* ======================================================
-          PREVENTION IMAGE
-      ====================================================== */}
+      {/* PREVENTION IMAGE */}
 
       <DiseaseVisual
         disease={
           disease
         }
-
         category={
           category
         }
-
         type="prevention"
-
         alt={`${visual.name} prevention illustration`}
-
         className="
+          pointer-events-none
           absolute
-          bottom-[-12px]
-          right-[5%]
-          h-[205px]
-          w-[300px]
+          bottom-[-8px]
+          right-[3%]
+          h-[174px]
+          w-[350px]
           object-contain
         "
       />

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 import LocationSelector from "../../components/LocationSelector";
-
+import logo from "../../assets/ui/logo.png";
 
 export default function UserSidebar({
   activePage,
@@ -28,7 +28,6 @@ export default function UserSidebar({
   onLocationChange,
   onResetToDefault,
 }) {
-
   const [
     open,
     setOpen,
@@ -39,34 +38,17 @@ export default function UserSidebar({
     setLocationExpanded,
   ] = useState(false);
 
-
-  const go = (
-    page
-  ) => {
-
+  const go = (page) => {
     onNavigate(page);
 
     setOpen(false);
 
-    if (
-      page !== "location"
-    ) {
+    if (page !== "location") {
       setLocationExpanded(false);
     }
-
   };
 
-
-  /*
-   * HEALTH OVERVIEW HAS INTENTIONALLY BEEN REMOVED.
-   *
-   * The page itself can still exist elsewhere in the
-   * application, but it is no longer exposed in the
-   * dashboard sidebar.
-   */
-
   const groups = [
-
     {
       label: null,
 
@@ -78,7 +60,6 @@ export default function UserSidebar({
         },
       ],
     },
-
 
     {
       label: "SURVEILLANCE",
@@ -98,7 +79,6 @@ export default function UserSidebar({
       ],
     },
 
-
     {
       label: "HEALTH & SAFETY",
 
@@ -116,7 +96,6 @@ export default function UserSidebar({
         },
       ],
     },
-
 
     {
       label: "COMMUNICATION",
@@ -141,13 +120,10 @@ export default function UserSidebar({
         },
       ],
     },
-
   ];
-
 
   return (
     <>
-
       {/* MOBILE MENU */}
 
       <button
@@ -174,14 +150,11 @@ export default function UserSidebar({
         "
         aria-label="Open user navigation"
       >
-        <Menu
-          size={20}
-        />
+        <Menu size={20} />
       </button>
 
 
       {open && (
-
         <button
           type="button"
           onClick={() =>
@@ -196,7 +169,6 @@ export default function UserSidebar({
           "
           aria-label="Close navigation"
         />
-
       )}
 
 
@@ -209,11 +181,11 @@ export default function UserSidebar({
           left-0
           z-50
           flex
-          w-[245px]
+          w-[262px]
           flex-col
           border-r
-          border-[#E6DFD5]
-          bg-[#FBF9F5]
+          border-[#E7E7E2]
+          bg-white
           transition-transform
           duration-200
           lg:translate-x-0
@@ -225,79 +197,58 @@ export default function UserSidebar({
         `}
       >
 
-        {/* BRAND */}
+        {/* =================================================
+            BRAND
+        ================================================= */}
 
-        <div
-          className="
-            flex
-            h-[88px]
+        <div className="
+          flex
+          h-[108px]
+          shrink-0
+          items-center
+          border-b
+          border-[#EEEEEA]
+          px-[21px]
+        ">
+
+          <div className="
+            relative
+            h-[57px]
+            w-[214px]
             shrink-0
-            items-center
-            border-b
-            border-[#EEE8DE]
-            px-5
-          "
-        >
+            overflow-hidden
+          ">
 
-          <div
-            className="
-              flex
-              items-center
-              gap-3
-            "
-          >
-
-            <div
+            <img
+              src={logo}
+              alt="Hyperlocal Disease Surveillance"
+              draggable="false"
               className="
-                flex
-                h-[42px]
-                w-[42px]
-                items-center
-                justify-center
-                rounded-[10px]
-                bg-[#2E9649]
-                text-white
-                shadow-[0_2px_8px_rgba(46,150,73,.13)]
+                absolute
+                inset-0
+                h-[57px]
+                w-[214px]
+                object-contain
               "
-            >
+            />
 
-              <ShieldCheck
-                size={25}
-                strokeWidth={2.15}
-              />
-
-            </div>
-
-
-            <div>
-
-              <p
-                className="
-                  text-[16px]
-                  font-semibold
-                  leading-none
-                  tracking-[-0.02em]
-                  text-[#111315]
-                "
-              >
-                HYPERLOCAL
-              </p>
-
-              <p
-                className="
-                  mt-[5px]
-                  whitespace-nowrap
-                  text-[9px]
-                  font-medium
-                  leading-none
-                  tracking-[0.075em]
-                  text-[#24282B]
-                "
-              >
-                DISEASE SURVEILLANCE
-              </p>
-
-            </div>
+            {/* Re-colour subtitle to match reference */}
+            <span className="
+              absolute
+              bottom-0
+              left-[54px]
+              h-[13px]
+              w-[160px]
+              bg-white
+              px-[2px]
+              text-[9px]
+              font-semibold
+              leading-[11px]
+              tracking-[0.02em]
+              text-[#16803C]
+            ">
+              DISEASE SURVEILLANCE
+            </span>
 
           </div>
 
@@ -311,25 +262,24 @@ export default function UserSidebar({
               ml-auto
               lg:hidden
             "
+            aria-label="Close navigation"
           >
-            <X
-              size={18}
-            />
+            <X size={18} />
           </button>
 
         </div>
 
 
-        {/* NAVIGATION */}
+        {/* =================================================
+            NAVIGATION
+        ================================================= */}
 
-        <nav
-          className="
-            flex-1
-            overflow-y-auto
-            px-[10px]
-            py-4
-          "
-        >
+        <nav className="
+          flex-1
+          overflow-y-auto
+          px-[16px]
+          py-[17px]
+        ">
 
           {groups.map(
             (
@@ -344,34 +294,28 @@ export default function UserSidebar({
                 }
                 className={
                   index
-                    ? "mt-[18px]"
+                    ? "mt-[25px]"
                     : ""
                 }
               >
 
                 {group.label && (
-
-                  <p
-                    className="
-                      mb-[8px]
-                      px-[13px]
-                      text-[10px]
-                      font-medium
-                      tracking-[0.16em]
-                      text-[#59483D]
-                    "
-                  >
+                  <p className="
+                    mb-[10px]
+                    px-[15px]
+                    text-[10px]
+                    font-semibold
+                    tracking-[0.13em]
+                    text-[#55585C]
+                  ">
                     {group.label}
                   </p>
-
                 )}
 
 
-                <div
-                  className="
-                    space-y-[3px]
-                  "
-                >
+                <div className="
+                  space-y-[3px]
+                ">
 
                   {group.items.map(
                     ({
@@ -384,9 +328,7 @@ export default function UserSidebar({
                         activePage ===
                         key;
 
-
                       return (
-
                         <button
                           key={key}
                           type="button"
@@ -395,30 +337,30 @@ export default function UserSidebar({
                           }
                           className={`
                             flex
-                            min-h-[40px]
+                            min-h-[56px]
                             w-full
                             items-center
-                            gap-3
-                            rounded-[9px]
-                            px-[13px]
+                            gap-4
+                            rounded-[11px]
+                            px-[16px]
                             text-left
-                            text-[12px]
+                            text-[14px]
                             transition
 
                             ${
                               active
-                                ? "bg-[#F0E3D2] font-medium text-[#17191C]"
-                                : "text-[#25292D] hover:bg-[#F5F0E8]"
+                                ? "bg-[#E8F5EC] font-semibold text-[#16803C]"
+                                : "text-[#1E252B] hover:bg-[#F6F8F5]"
                             }
                           `}
                         >
 
                           <Icon
-                            size={18}
+                            size={22}
                             strokeWidth={
                               active
-                                ? 2.05
-                                : 1.75
+                                ? 2.1
+                                : 1.8
                             }
                           />
 
@@ -427,38 +369,33 @@ export default function UserSidebar({
                           </span>
 
                         </button>
-
                       );
-
                     }
                   )}
 
                 </div>
 
               </div>
-
             )
           )}
 
 
-          {/* LOCATION */}
+          {/* =================================================
+              LOCATION
+          ================================================= */}
 
-          <div
-            className="
-              mt-[18px]
-            "
-          >
+          <div className="
+            mt-[25px]
+          ">
 
-            <p
-              className="
-                mb-[8px]
-                px-[13px]
-                text-[10px]
-                font-medium
-                tracking-[0.16em]
-                text-[#59483D]
-              "
-            >
+            <p className="
+              mb-[10px]
+              px-[15px]
+              text-[10px]
+              font-semibold
+              tracking-[0.13em]
+              text-[#55585C]
+            ">
               LOCATION
             </p>
 
@@ -473,38 +410,36 @@ export default function UserSidebar({
               }
               className={`
                 flex
-                min-h-[40px]
+                min-h-[56px]
                 w-full
                 items-center
-                gap-3
-                rounded-[9px]
-                px-[13px]
+                gap-4
+                rounded-[11px]
+                px-[16px]
                 text-left
-                text-[12px]
+                text-[14px]
 
                 ${
                   locationExpanded
-                    ? "bg-[#F0E3D2] font-medium"
-                    : "hover:bg-[#F5F0E8]"
+                    ? "bg-[#F4F8F4] font-medium"
+                    : "text-[#1E252B] hover:bg-[#F6F8F5]"
                 }
               `}
             >
 
               <MapPin
-                size={18}
-                strokeWidth={1.75}
+                size={22}
+                strokeWidth={1.8}
               />
 
-              <span
-                className="
-                  flex-1
-                "
-              >
+              <span className="
+                flex-1
+              ">
                 Location
               </span>
 
               <ChevronDown
-                size={15}
+                size={18}
                 className={
                   locationExpanded
                     ? "rotate-180"
@@ -516,18 +451,15 @@ export default function UserSidebar({
 
 
             {locationExpanded && (
-
-              <div
-                className="
-                  mt-2
-                  rounded-xl
-                  border
-                  border-[#E7E1D8]
-                  bg-white
-                  p-3
-                  shadow-sm
-                "
-              >
+              <div className="
+                mt-2
+                rounded-xl
+                border
+                border-[#E7E1D8]
+                bg-white
+                p-3
+                shadow-sm
+              ">
 
                 <LocationSelector
                   value={
@@ -540,47 +472,38 @@ export default function UserSidebar({
 
 
                 {selectedLocation?.talukId && (
+                  <div className="
+                    mt-3
+                    rounded-lg
+                    bg-[#F7F8F6]
+                    px-3
+                    py-2
+                  ">
 
-                  <div
-                    className="
-                      mt-3
-                      rounded-lg
-                      bg-[#F7F5F0]
-                      px-3
-                      py-2
-                    "
-                  >
-
-                    <p
-                      className="
-                        text-[8px]
-                        uppercase
-                        tracking-[0.1em]
-                        text-[#8B8178]
-                      "
-                    >
+                    <p className="
+                      text-[8px]
+                      uppercase
+                      tracking-[0.1em]
+                      text-[#8B8178]
+                    ">
                       Currently Monitoring
                     </p>
 
-                    <p
-                      className="
-                        mt-1
-                        text-[11px]
-                        font-semibold
-                        text-[#1A1D20]
-                      "
-                    >
+                    <p className="
+                      mt-1
+                      text-[11px]
+                      font-semibold
+                      text-[#1A1D20]
+                    ">
                       {
                         selectedLocation.talukName
                       }
                     </p>
 
-                    <p
-                      className="
-                        text-[9px]
-                        text-[#737A80]
-                      "
-                    >
+                    <p className="
+                      text-[9px]
+                      text-[#737A80]
+                    ">
                       {
                         selectedLocation.districtName
                       }
@@ -591,7 +514,6 @@ export default function UserSidebar({
                     </p>
 
                   </div>
-
                 )}
 
 
@@ -624,7 +546,6 @@ export default function UserSidebar({
                   )}
 
               </div>
-
             )}
 
           </div>
@@ -632,15 +553,16 @@ export default function UserSidebar({
         </nav>
 
 
-        {/* LOGOUT */}
+        {/* =================================================
+            LOGOUT
+        ================================================= */}
 
-        <div
-          className="
-            border-t
-            border-[#EEE8DE]
-            p-[10px]
-          "
-        >
+        <div className="
+          border-t
+          border-[#EEEEEA]
+          px-[16px]
+          py-[15px]
+        ">
 
           <button
             type="button"
@@ -649,21 +571,21 @@ export default function UserSidebar({
             }
             className="
               flex
-              min-h-[42px]
+              min-h-[50px]
               w-full
               items-center
-              gap-3
-              rounded-[9px]
-              px-[13px]
-              text-[12px]
-              text-[#25292D]
-              hover:bg-[#F5F0E8]
+              gap-4
+              rounded-[11px]
+              px-[16px]
+              text-[14px]
+              text-[#20262B]
+              hover:bg-[#F7F8F6]
               hover:text-[#C62828]
             "
           >
 
             <LogOut
-              size={18}
+              size={22}
             />
 
             Logout
@@ -673,7 +595,6 @@ export default function UserSidebar({
         </div>
 
       </aside>
-
     </>
   );
 }

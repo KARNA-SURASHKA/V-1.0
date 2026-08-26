@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { getDiseaseVisual, getPreventionVisual } from "../data/diseaseVisuals";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  getDiseaseVisual,
+  getPreventionVisual,
+} from "../data/diseaseVisuals";
+
 
 export default function DiseaseVisual({
   disease,
@@ -8,29 +16,90 @@ export default function DiseaseVisual({
   alt,
   className = "",
 }) {
+
   const visual =
     type === "prevention"
-      ? getPreventionVisual(disease, category)
-      : getDiseaseVisual(disease, category);
+      ? getPreventionVisual(
+          disease,
+          category
+        )
+      : getDiseaseVisual(
+          disease,
+          category
+        );
 
-  const [src, setSrc] = useState(
+
+  const source =
     type === "prevention"
       ? visual.preventionImage
-      : visual.updateImage
-  );
+      : visual.updateImage;
+
 
   const fallback =
-    visual.fallbackImage || visual.diseaseImage;
+    visual.fallbackImage ||
+    visual.diseaseImage;
+
+
+  const [
+    src,
+    setSrc,
+  ] = useState(
+    source ||
+    fallback
+  );
+
+
+  /*
+   * ==========================================================
+   * IMPORTANT:
+   *
+   * When the user changes locality and the highest-risk
+   * disease changes, update the image immediately.
+   * ==========================================================
+   */
+
+  useEffect(() => {
+
+    setSrc(
+      source ||
+      fallback
+    );
+
+  }, [
+    source,
+    fallback,
+    disease,
+    category,
+    type,
+  ]);
+
 
   return (
     <img
-      src={src || fallback}
-      alt={alt || `${visual.name} health illustration`}
+      src={
+        src ||
+        fallback
+      }
+      alt={
+        alt ||
+        `${visual.name} health illustration`
+      }
       onError={() => {
-        if (src !== fallback) setSrc(fallback);
+
+        if (
+          src !==
+          fallback
+        ) {
+          setSrc(
+            fallback
+          );
+        }
+
       }}
       draggable="false"
-      className={className}
+      className={
+        className
+      }
     />
   );
 }
