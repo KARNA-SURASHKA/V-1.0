@@ -28,6 +28,9 @@ cd Hyperlocal_Disease_Surveillance_FullStack_moni
 # Create a Python virtual environment
 python -m venv venv
 
+# Seed the database (creates *surveillance.db* in this folder)
+python -m app.seed
+
 # Activate it
 # Windows
 .\venv\Scripts\Activate.ps1
@@ -36,9 +39,6 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Seed the database (creates *surveillance.db* in this folder)
-python -m app.seed
 
 # Run the FastAPI app
 uvicorn app.main:app --reload
