@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=D:\Hyperlocal_Disease_Surveillance_FullStack_moni_updated\Hyperlocal_Disease_Surveillance_FullStack_moni\backend\venv
+set VIRTUAL_ENV=D:\V-1.0\Hyperlocal_Disease_Surveillance_FullStack_moni\backend\venv
 
 if not defined PROMPT set PROMPT=$P$G
 
