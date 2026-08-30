@@ -84,10 +84,17 @@ Thumbs.db
 *.tmp
 *.temp
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 # Python virtual environment
 /backend/venv/
 
 # Python cache files
 __pycache__/
+<<<<<<< Updated upstream
 *.py[cod]
+=======
+*.py[cod]
+>>>>>>> Stashed changes
