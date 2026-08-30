@@ -2,7 +2,8 @@
 // API CONFIGURATION
 // ============================================================
 
-const API_BASE = "http://localhost:8000";
+// Keep this identical to the address shown by Uvicorn.
+const API_BASE = "http://127.0.0.1:8000";
 
 // ============================================================
 // SESSION / AUTH HELPERS
@@ -23,8 +24,12 @@ const getSession = () => {
 };
 
 const setSession = (session) => {
-  if (session === null || session === undefined) {
+  if (
+    session === null ||
+    session === undefined
+  ) {
     sessionStorage.removeItem("kt_session");
+    sessionStorage.removeItem("kt_token");
     return;
   }
 
@@ -74,9 +79,7 @@ const getErrorMessage = (detail) => {
   if (Array.isArray(detail)) {
     return detail
       .map((item) => {
-        if (!item) {
-          return "";
-        }
+        if (!item) return "";
 
         if (typeof item === "string") {
           return item;
@@ -120,25 +123,15 @@ const getErrorMessage = (detail) => {
 };
 
 // ============================================================
-// GENERIC API REQUEST
+// BUILD URL
 // ============================================================
 
-const request = async (
+const buildUrl = (
   endpoint,
-  options = {}
+  params
 ) => {
-  const {
-    method = "GET",
-    body,
-    params,
-    auth = true,
-  } = options;
-
-  let url = `${API_BASE}${endpoint}`;
-
-  // ----------------------------------------------------------
-  // QUERY PARAMETERS
-  // ----------------------------------------------------------
+  let url =
+    `${API_BASE}${endpoint}`;
 
   if (params) {
     const searchParams =
@@ -167,9 +160,28 @@ const request = async (
     }
   }
 
-  // ----------------------------------------------------------
-  // HEADERS
-  // ----------------------------------------------------------
+  return url;
+};
+
+// ============================================================
+// GENERIC REQUEST
+// ============================================================
+
+const request = async (
+  endpoint,
+  options = {}
+) => {
+  const {
+    method = "GET",
+    body,
+    params,
+    auth = true,
+  } = options;
+
+  const url = buildUrl(
+    endpoint,
+    params
+  );
 
   const headers = {
     Accept: "application/json",
@@ -179,8 +191,9 @@ const request = async (
     body !== undefined &&
     body !== null
   ) {
-    headers["Content-Type"] =
-      "application/json";
+    headers[
+      "Content-Type"
+    ] = "application/json";
   }
 
   // ----------------------------------------------------------
@@ -196,6 +209,17 @@ const request = async (
     }
   }
 
+  console.log(
+    `%c[API REQUEST] ${method} ${url}`,
+    "color:#087f5b;font-weight:bold",
+    {
+      authenticated:
+        auth && Boolean(getToken()),
+      hasToken:
+        Boolean(getToken()),
+    }
+  );
+
   // ----------------------------------------------------------
   // FETCH
   // ----------------------------------------------------------
@@ -203,23 +227,28 @@ const request = async (
   let response;
 
   try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body:
-        body !== undefined &&
-        body !== null
-          ? JSON.stringify(body)
-          : undefined,
-    });
+    response = await fetch(
+      url,
+      {
+        method,
+        headers,
+        body:
+          body !== undefined &&
+          body !== null
+            ? JSON.stringify(body)
+            : undefined,
+      }
+    );
   } catch (error) {
     console.error(
-      "API connection error:",
+      `[API NETWORK ERROR] ${method} ${url}`,
       error
     );
 
     throw new Error(
-      `Could not reach the backend. Is it running at ${API_BASE}?`
+      `Network error while calling ${method} ${endpoint}. ` +
+      `The browser could not complete the request to ${API_BASE}. ` +
+      `Check the browser Console and backend terminal.`
     );
   }
 
@@ -240,32 +269,23 @@ const request = async (
     }
   }
 
+  console.log(
+    `%c[API RESPONSE] ${response.status} ${method} ${url}`,
+    response.ok
+      ? "color:#087f5b;font-weight:bold"
+      : "color:#c92a2a;font-weight:bold",
+    data
+  );
+
   // ----------------------------------------------------------
-  // ERROR RESPONSE
+  // HTTP ERROR
   // ----------------------------------------------------------
 
   if (!response.ok) {
-    let message;
-
-    if (
-      data &&
-      typeof data === "object"
-    ) {
-      message = getErrorMessage(
-        data.detail
+    let message =
+      getErrorMessage(
+        data?.detail ?? data
       );
-
-      if (
-        !message ||
-        message === "[object Object]"
-      ) {
-        message =
-          getErrorMessage(data);
-      }
-    } else {
-      message =
-        getErrorMessage(data);
-    }
 
     if (
       !message ||
@@ -273,33 +293,102 @@ const request = async (
     ) {
       message =
         response.statusText ||
-        "Request failed";
+        "Request failed.";
     }
 
     // --------------------------------------------------------
-    // Clear invalid/expired authentication.
+    // Authentication failure
     // --------------------------------------------------------
 
     if (
       response.status === 401 &&
       auth
     ) {
+      console.warn(
+        `[API AUTH ERROR] ${endpoint}: 401 Unauthorized`
+      );
+
       clearSession();
+
+      throw new Error(
+        `Authentication expired or invalid for ${endpoint}. ` +
+        `Please log in again.`
+      );
     }
 
-    throw new Error(message);
+    // --------------------------------------------------------
+    // Permission failure
+    // --------------------------------------------------------
+
+    if (
+      response.status === 403
+    ) {
+      throw new Error(
+        `You do not have permission to access ${endpoint}. ` +
+        `Your account must have the Medical Supervisor role.`
+      );
+    }
+
+    // --------------------------------------------------------
+    // Not found
+    // --------------------------------------------------------
+
+    if (
+      response.status === 404
+    ) {
+      throw new Error(
+        `API endpoint not found: ${endpoint}`
+      );
+    }
+
+    // --------------------------------------------------------
+    // Server error
+    // --------------------------------------------------------
+
+    if (
+      response.status >= 500
+    ) {
+      throw new Error(
+        `Backend error ${response.status} from ${endpoint}: ${message}`
+      );
+    }
+
+    throw new Error(
+      `${message} (HTTP ${response.status})`
+    );
   }
 
   return data;
 };
 
 // ============================================================
-// API OBJECT
+// EMPTY HOME RELIEF RESPONSE
+// ============================================================
+
+const emptyHomeReliefResponse = () => ({
+  query: "",
+  context: {
+    conditions: [],
+    pregnancy: false,
+    breastfeeding: false,
+    age: null,
+  },
+  recommended: [],
+  use_with_caution: [],
+  restricted: [],
+  alternatives: [],
+  total_found: 0,
+  safety_filter_applied: false,
+});
+
+// ============================================================
+// API
 // ============================================================
 
 const api = {
+
   // ==========================================================
-  // AUTHENTICATION
+  // AUTH
   // ==========================================================
 
   login: async (
@@ -394,7 +483,7 @@ const api = {
   },
 
   // ==========================================================
-  // AI MEDICAL CHATBOT
+  // AI MEDICAL CHAT
   // ==========================================================
 
   medicalChat: async ({
@@ -425,21 +514,23 @@ const api = {
     );
   },
 
-  getMedicalDiseases: async () => {
-    return request(
-      "/medical/diseases"
-    );
-  },
+  getMedicalDiseases:
+    async () => {
+      return request(
+        "/medical/diseases"
+      );
+    },
 
   // ==========================================================
-  // EMERGING DISEASE
+  // EMERGING DISEASES
   // ==========================================================
 
-  getEmergingDiseases: async () => {
-    return request(
-      "/medical/emerging"
-    );
-  },
+  getEmergingDiseases:
+    async () => {
+      return request(
+        "/medical/emerging"
+      );
+    },
 
   getMedicalEmergingDiseases:
     async () => {
@@ -449,18 +540,29 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - OVERVIEW
+  // MEDICAL OVERVIEW
   // ==========================================================
 
   getMedicalOverview:
-    async () => {
+    async (talukId) => {
       return request(
-        "/medical/overview"
+        "/medical/overview",
+        {
+          params:
+            talukId !== undefined &&
+            talukId !== null &&
+            talukId !== ""
+              ? {
+                  taluk_id:
+                    talukId,
+                }
+              : undefined,
+        }
       );
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - REPORTS
+  // MEDICAL REPORTS
   // ==========================================================
 
   getMedicalReports:
@@ -474,7 +576,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - WEEKLY MONITORING
+  // WEEKLY MONITORING
   // ==========================================================
 
   getMedicalMonitoring:
@@ -496,7 +598,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - ANALYTICS
+  // ANALYTICS
   // ==========================================================
 
   getMedicalAnalytics:
@@ -512,7 +614,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - RISK MAP
+  // RISK MAP
   // ==========================================================
 
   getMedicalRiskMap:
@@ -530,7 +632,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - EMERGING DISEASE REVIEW
+  // EMERGING REVIEW
   // ==========================================================
 
   reviewEmergingDisease:
@@ -548,7 +650,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - AGENTS
+  // SUPERVISOR AGENTS
   // ==========================================================
 
   getSupervisorAgents:
@@ -565,8 +667,47 @@ const api = {
       );
     },
 
+  // ----------------------------------------------------------
+  // FIX:
+  // SUBMIT AGENT ISSUE
+  // ----------------------------------------------------------
+
+  submitAgentIssue:
+    async (payload) => {
+      return request(
+        "/medical/agent-issues",
+        {
+          method: "POST",
+          body: {
+            agent_id:
+              Number(payload?.agent_id),
+
+            issue_type:
+              String(
+                payload?.issue_type || ""
+              ).trim(),
+
+            severity:
+              String(
+                payload?.severity || "Low"
+              ).trim(),
+
+            description:
+              String(
+                payload?.description || ""
+              ).trim(),
+
+            evidence:
+              String(
+                payload?.evidence || ""
+              ).trim(),
+          },
+        }
+      );
+    },
+
   // ==========================================================
-  // AGENT - EMERGING DISEASE
+  // AGENT
   // ==========================================================
 
   getAgentEmerging:
@@ -615,10 +756,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // ADMIN - REPORTS
-  // ==========================================================
-
   getAllReports:
     async (params = {}) => {
       return request(
@@ -628,10 +765,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // ADMIN - PREDICTIONS
-  // ==========================================================
 
   runPredictions:
     async () => {
@@ -652,10 +785,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // ADMIN - NOTIFICATIONS
-  // ==========================================================
 
   listAdminNotifications:
     async () => {
@@ -687,88 +816,46 @@ const api = {
     },
 
   // ==========================================================
-  // HOME RELIEF - USER
+  // HOME RELIEF
   // ==========================================================
 
   searchHomeRelief:
     async (query) => {
       const searchText =
-        String(
-          query || ""
-        ).trim();
+        String(query || "").trim();
 
       if (!searchText) {
-        return {
-          query: "",
-          context: {
-            conditions: [],
-            pregnancy: false,
-            breastfeeding: false,
-            age: null,
-          },
-          recommended: [],
-          use_with_caution: [],
-          restricted: [],
-          alternatives: [],
-          total_found: 0,
-          safety_filter_applied: false,
-        };
+        return emptyHomeReliefResponse();
       }
 
       return request(
         "/home-relief/search",
         {
-          method: "GET",
           params: {
             q: searchText,
           },
         }
       );
     },
-
-  // ==========================================================
-  // COMPATIBILITY WITH EXISTING HOME RELIEF COMPONENTS
-  // ==========================================================
 
   getHomeRelief:
     async (query) => {
       const searchText =
-        String(
-          query || ""
-        ).trim();
+        String(query || "").trim();
 
       if (!searchText) {
-        return {
-          query: "",
-          context: {
-            conditions: [],
-            pregnancy: false,
-            breastfeeding: false,
-            age: null,
-          },
-          recommended: [],
-          use_with_caution: [],
-          restricted: [],
-          alternatives: [],
-          total_found: 0,
-          safety_filter_applied: false,
-        };
+        return emptyHomeReliefResponse();
       }
 
       return request(
         "/home-relief/search",
         {
-          method: "GET",
           params: {
             q: searchText,
           },
         }
       );
     },
-
-  // ==========================================================
-  // HOME RELIEF DETAIL
-  // ==========================================================
 
   getHomeReliefRemedy:
     async (
@@ -782,10 +869,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // HOME RELIEF SAFETY
-  // ==========================================================
 
   getHomeReliefSafety:
     async (
@@ -804,10 +887,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // HOME RELIEF ALTERNATIVES
-  // ==========================================================
-
   getHomeReliefAlternatives:
     async (
       remedyId,
@@ -825,42 +904,21 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // HOME RELIEF SEARCH WITH CONTEXT
-  // ==========================================================
-
   searchHomeReliefWithContext:
     async (
       query,
       context = {}
     ) => {
       const searchText =
-        String(
-          query || ""
-        ).trim();
+        String(query || "").trim();
 
       if (!searchText) {
-        return {
-          query: "",
-          context: {
-            conditions: [],
-            pregnancy: false,
-            breastfeeding: false,
-            age: null,
-          },
-          recommended: [],
-          use_with_caution: [],
-          restricted: [],
-          alternatives: [],
-          total_found: 0,
-          safety_filter_applied: false,
-        };
+        return emptyHomeReliefResponse();
       }
 
       return request(
         "/home-relief/search",
         {
-          method: "GET",
           params: {
             q: searchText,
             ...context,
@@ -870,7 +928,7 @@ const api = {
     },
 
   // ==========================================================
-  // MEDICAL SUPERVISOR - HOME RELIEF
+  // MEDICAL HOME RELIEF
   // ==========================================================
 
   getSupervisorHomeRelief:
@@ -882,10 +940,6 @@ const api = {
         }
       );
     },
-
-  // ----------------------------------------------------------
-  // Compatibility aliases
-  // ----------------------------------------------------------
 
   getMedicalHomeRelief:
     async (params = {}) => {
@@ -917,10 +971,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // CREATE HOME RELIEF
-  // ==========================================================
-
   createHomeRelief:
     async (payload) => {
       return request(
@@ -931,10 +981,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // UPDATE HOME RELIEF
-  // ==========================================================
 
   updateHomeRelief:
     async (
@@ -950,10 +996,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // DELETE HOME RELIEF
-  // ==========================================================
-
   deleteHomeRelief:
     async (remedyId) => {
       return request(
@@ -964,10 +1006,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // DEACTIVATE HOME RELIEF
-  // ==========================================================
-
   deactivateHomeRelief:
     async (remedyId) => {
       return request(
@@ -977,10 +1015,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // HOME RELIEF SAFETY RULES
-  // ==========================================================
 
   createHomeReliefSafetyRule:
     async (
@@ -1024,10 +1058,6 @@ const api = {
       );
     },
 
-  // ==========================================================
-  // APPROVE HOME RELIEF
-  // ==========================================================
-
   approveHomeRelief:
     async (remedyId) => {
       return request(
@@ -1037,10 +1067,6 @@ const api = {
         }
       );
     },
-
-  // ==========================================================
-  // REJECT HOME RELIEF
-  // ==========================================================
 
   rejectHomeRelief:
     async (
@@ -1059,7 +1085,7 @@ const api = {
     },
 
   // ==========================================================
-  // GENERIC REQUEST
+  // GENERIC
   // ==========================================================
 
   request,
@@ -1089,7 +1115,7 @@ export const RISK_COLORS = {
 };
 
 // ============================================================
-// NAMED EXPORTS
+// EXPORTS
 // ============================================================
 
 export {
@@ -1102,7 +1128,7 @@ export {
 };
 
 // ============================================================
-// DEFAULT EXPORT
+// DEFAULT
 // ============================================================
 
 export default api;

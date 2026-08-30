@@ -15,56 +15,35 @@ import {
   Pencil,
   Trash2,
   X,
+  Users,
+  ClipboardList,
+  AlertTriangle,
+  ChartNoAxesCombined,
+  Bug,
+  Bell,
+  Target,
+  Activity,
+  Clock3,
 } from "lucide-react";
 
 import PortalShell from "../../components/PortalShell";
 import { api, DISEASES } from "../../api";
+import skyline from "../../assets/health/precautions/skyline.png";
+import pulseIllustration from "../../assets/ui/pulse_illustration.png";
 
 // ============================================================
 // SIDEBAR TABS
 // ============================================================
 
 const TABS = [
-  {
-    key: "overview",
-    label: "Overview",
-    icon: LayoutDashboard,
-  },
-  {
-    key: "reports",
-    label: "Disease Reports",
-    icon: FileText,
-  },
-  {
-    key: "monitoring",
-    label: "Weekly Monitoring",
-    icon: ClipboardCheck,
-  },
-  {
-    key: "analytics",
-    label: "Surveillance Analytics",
-    icon: BarChart3,
-  },
-  {
-    key: "risk-map",
-    label: "Risk Map",
-    icon: MapPinned,
-  },
-  {
-    key: "emerging",
-    label: "Emerging Disease Review",
-    icon: Microscope,
-  },
-  {
-    key: "agents",
-    label: "Agent Oversight",
-    icon: ShieldAlert,
-  },
-  {
-    key: "home-relief",
-    label: "Home Relief",
-    icon: HeartPulse,
-  },
+  { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "reports", label: "Disease Reports", icon: FileText },
+  { key: "monitoring", label: "Weekly Monitoring", icon: ClipboardCheck },
+  { key: "risk-map", label: "Risk Map", icon: MapPinned },
+  { key: "analytics", label: "Surveillance Analytics", icon: BarChart3 },
+  { key: "agents", label: "Agent Oversight", icon: ShieldAlert },
+  { key: "alerts", label: "Alerts", icon: Bell },
+  { key: "home-relief", label: "Home Relief", icon: HeartPulse },
 ];
 
 // ============================================================
@@ -220,6 +199,9 @@ export default function MedicalSupervisorPortal({
   const [reportWeek, setReportWeek] =
     useState("");
 
+  const [selectedTalukId, setSelectedTalukId] =
+    useState("");
+
   // ==========================================================
   // LOAD ALL MEDICAL SUPERVISOR DATA
   // ==========================================================
@@ -240,7 +222,9 @@ export default function MedicalSupervisorPortal({
         agentsData,
         issuesData,
       ] = await Promise.all([
-        api.getMedicalOverview(),
+        api.getMedicalOverview(
+          selectedTalukId || undefined
+        ),
 
         api.getMedicalReports({
           disease:
@@ -268,6 +252,18 @@ export default function MedicalSupervisorPortal({
       ]);
 
       setOverview(overviewData);
+
+      // Match the reference dashboard by opening on Virajpet when it is
+      // available. If it is not present, keep the user's current scope.
+      if (!selectedTalukId && Array.isArray(overviewData?.locations)) {
+        const virajpet = overviewData.locations.find((location) =>
+          String(location.taluk_name || "").toLowerCase() === "virajpet"
+        );
+        if (virajpet) {
+          setSelectedTalukId(String(virajpet.taluk_id));
+          return;
+        }
+      }
 
       setReports(
         Array.isArray(reportsData)
@@ -331,7 +327,9 @@ export default function MedicalSupervisorPortal({
     reportDisease,
     reportWeek,
     diseaseFilter,
+    selectedTalukId,
   ]);
+
 
   // ==========================================================
   // LOAD HOME RELIEF
@@ -780,18 +778,6 @@ export default function MedicalSupervisorPortal({
   };
 
   // ==========================================================
-  // OVERVIEW TOTAL
-  // ==========================================================
-
-  const totalCases =
-    useMemo(
-      () =>
-        overview?.reports_this_week ||
-        0,
-      [overview]
-    );
-
-  // ==========================================================
   // UI
   // ==========================================================
 
@@ -800,55 +786,41 @@ export default function MedicalSupervisorPortal({
       title="Karna Suraksha — Medical Supervisor"
       subtitle="Medical verification and surveillance oversight"
       portalLabel="Medical Supervisor"
+      variant="medical"
+      medicalLocation={overview?.selected_location?.label || "All monitored areas"}
+      medicalLocations={overview?.locations || []}
+      selectedMedicalLocation={selectedTalukId}
+      onMedicalLocationChange={setSelectedTalukId}
+      medicalAlertCount={overview?.high_risk_alerts || 0}
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
       onExit={onExit}
     >
-      {/* ======================================================
-          PAGE HEADER
-      ====================================================== */}
+      {tab !== "overview" && (
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#087A32]">
+              Medical Supervisor
+            </p>
+            <h2 className="text-[26px] font-semibold text-[#102A43] mt-1">
+              {TABS.find((item) => item.key === tab)?.label}
+            </h2>
+            <p className="text-[13px] text-[#52606D] mt-1">
+              Review and monitor surveillance activity.
+            </p>
+          </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <p className="text-[13px] font-medium text-[#087A32]">
-            Medical surveillance control
-          </p>
-
-          <h2 className="text-[28px] font-semibold text-[#102A43] mt-1">
-            {
-              TABS.find(
-                (item) =>
-                  item.key === tab
-              )?.label
-            }
-          </h2>
-
-          <p className="text-[14px] text-[#52606D] mt-1">
-            Review agent-submitted
-            surveillance data while
-            keeping administrative
-            decisions with Admin.
-          </p>
+          <button
+            onClick={loadAll}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#D9E2DC] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#315C88] hover:bg-[#F7FAF8] disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
-
-        <button
-          onClick={loadAll}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#D9E2DC] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#315C88] hover:bg-[#F7FAF8] disabled:opacity-50"
-        >
-          <RefreshCw
-            size={15}
-            className={
-              refreshing
-                ? "animate-spin"
-                : ""
-            }
-          />
-
-          Refresh
-        </button>
-      </div>
+      )}
 
       {/* ======================================================
           ERROR
@@ -877,7 +849,7 @@ export default function MedicalSupervisorPortal({
       {tab === "overview" && (
         <Overview
           overview={overview}
-          totalCases={totalCases}
+          onViewReports={() => setTab("reports")}
         />
       )}
 
@@ -975,11 +947,14 @@ export default function MedicalSupervisorPortal({
         <AgentOversight
           agents={agents}
           issues={issues}
-          onSubmit={
-            submitIssue
-          }
+          onSubmit={submitIssue}
         />
       )}
+
+      {tab === "alerts" && (
+        <AlertsView alerts={overview?.recent_alerts || []} />
+      )}
+
     </PortalShell>
   );
 }
@@ -988,122 +963,278 @@ export default function MedicalSupervisorPortal({
 // OVERVIEW
 // ============================================================
 
-function Overview({
-  overview,
-  totalCases,
-}) {
+function Overview({ overview, onViewReports }) {
   if (!overview) {
     return <Loading />;
   }
 
-  const cards = [
-    [
-      "Active Agents",
-      overview.active_agents,
-    ],
+  const formatChange = (value) => {
+    if (!value) return "—";
+    return `${value > 0 ? "↗" : "↘"} ${Math.abs(value)}%`;
+  };
 
-    [
-      "Total Taluks",
-      overview.total_taluks,
-    ],
+  const formatDateTime = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
 
-    [
-      "Reports This Week",
-      overview.reports_this_week,
-    ],
+  const riskDot = (level) => {
+    if (level === "Critical" || level === "High") return "bg-[#E11D48]";
+    if (level === "Moderate") return "bg-[#F59E0B]";
+    return "bg-[#159447]";
+  };
 
-    [
-      "Pending Submissions",
-      overview.pending_agent_submissions,
-    ],
+  const diseaseIcon = (disease) => {
+    const map = {
+      Dengue: <Bug size={14} />,
+      Malaria: <Bug size={14} />,
+      Typhoid: <Activity size={14} />,
+      Influenza: <Activity size={14} />,
+      Chikungunya: <Bug size={14} />,
+    };
+    return map[disease] || <Activity size={14} />;
+  };
 
-    [
-      "Pending Disease Reviews",
-      overview.pending_emerging_reviews,
-    ],
-
-    [
-      "Tracked Diseases",
-      overview.diseases_tracked,
-    ],
-  ];
+  const coverage = Math.max(0, Math.min(100, overview.reporting_coverage_percent || 0));
+  const circumference = 2 * Math.PI * 54;
+  const dashOffset = circumference - (circumference * coverage) / 100;
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
-        {cards.map(
-          ([label, value]) => (
-            <Stat
-              key={label}
-              label={label}
-              value={value}
-            />
-          )
-        )}
-      </div>
-
-      <div className="grid xl:grid-cols-2 gap-5">
-        <Panel title="Current surveillance status">
-          <div className="grid grid-cols-2 gap-4">
-            <Metric
-              label="Current reporting week"
-              value={`Week ${
-                overview.current_week
-              }`}
-            />
-
-            <Metric
-              label="Cases reported this week"
-              value={totalCases}
-            />
-
-            <Metric
-              label="Agents submitted"
-              value={
-                overview.submitted_agents_this_week
-              }
-            />
-
-            <Metric
-              label="Agent issues awaiting Admin"
-              value={
-                overview.pending_agent_issue_reports
-              }
-            />
+      {/* Welcome / context */}
+      <section className="relative overflow-hidden min-h-[120px] px-3 pt-1 pb-2">
+        <div className="relative z-10 max-w-[55%]">
+          <h2 className="text-[27px] leading-tight font-semibold tracking-[-0.025em] text-[#101B38]">
+            Good {new Date().getHours() < 12 ? "Morning" : new Date().getHours() < 17 ? "Afternoon" : "Evening"}, <span className="ml-1">{getSupervisorDisplayName()}</span> 👋
+          </h2>
+          <p className="mt-2 text-[14px] text-[#405477]">
+            Here’s the current surveillance summary for {overview.selected_location?.label || "all monitored areas"}.
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-[12px] text-[#52627D]">
+            <ClockIcon />
+            <span>Last updated: Today</span>
+            <span>•</span>
+            <span>{new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date())}</span>
           </div>
-        </Panel>
+        </div>
+        <img
+          src={skyline}
+          alt=""
+          className="absolute right-[-2px] bottom-0 w-[49%] max-h-[108px] object-contain object-right opacity-90 pointer-events-none"
+        />
+      </section>
 
-        <Panel title="Medical authority responsibilities">
-          <ul className="space-y-3 text-[13px] text-[#52606D]">
-            <li>
-              ✓ Monitor all weekly
-              disease reports
-              submitted by agents.
-            </li>
+      {/* Headline cards */}
+      <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <DashboardMetric icon="people" tone="green" label="Active Diseases" value={overview.diseases_tracked} helper="Under surveillance" />
+        <DashboardMetric icon="clipboard" tone="blue" label="Total Cases (This Week)" value={overview.total_cases_this_week} helper={`${formatChange(overview.total_cases_previous_week ? Math.round(((overview.total_cases_this_week - overview.total_cases_previous_week) / overview.total_cases_previous_week) * 100) : 0)} vs last week`} />
+        <DashboardMetric icon="alert" tone="orange" label="High Risk Alerts" value={overview.high_risk_alerts} helper={overview.high_risk_alerts ? "Require attention" : "No high-risk areas"} />
+        <DashboardMetric icon="chart" tone="purple" label="Reports This Week" value={overview.reports_this_week} helper={`${overview.submitted_agents_this_week} active agent${overview.submitted_agents_this_week === 1 ? "" : "s"} submitted`} />
+      </section>
 
-            <li>
-              ✓ Verify suspected
-              emerging diseases
-              before public display.
-            </li>
+      {/* Main content row */}
+      <section className="grid xl:grid-cols-[1.6fr_1.25fr_1fr] gap-4 items-stretch">
+        <DashboardPanel title="DISEASE OVERVIEW" icon="virus">
+          <div className="grid grid-cols-[1.4fr_0.65fr_0.55fr_0.7fr_0.65fr] gap-2 px-2 pb-2 text-[10px] font-medium text-[#687790]">
+            <span>Disease</span><span>Cases (This Week)</span><span>Change</span><span>Risk Level</span><span>Status</span>
+          </div>
+          <div className="divide-y divide-[#EEF1F2]">
+            {overview.disease_overview?.map((item) => (
+              <div key={item.disease} className="grid grid-cols-[1.4fr_0.65fr_0.55fr_0.7fr_0.65fr] gap-2 items-center px-2 py-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-7 h-7 rounded-full bg-[#F2F7F4] flex items-center justify-center text-[13px]">{diseaseIcon(item.disease)}</span>
+                  <span className="text-[12px] font-semibold text-[#17233D] truncate">{item.disease}</span>
+                </div>
+                <span className="text-[12px] font-semibold text-[#17233D]">{item.cases_this_week}</span>
+                <span className={`text-[11px] font-semibold ${item.change_percent > 0 ? "text-[#E11D48]" : item.change_percent < 0 ? "text-[#159447]" : "text-[#687790]"}`}>{formatChange(item.change_percent)}</span>
+                <span><Risk level={item.risk_level} /></span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#17233D]"><span className={`w-2 h-2 rounded-full ${riskDot(item.risk_level)}`} />{item.status}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-3 flex justify-center">
+            <button type="button" onClick={onViewReports} className="inline-flex items-center gap-2 text-[11px] font-semibold text-[#087A32] hover:text-[#065F28]">
+              View All Disease Reports <span className="text-[15px] leading-none">→</span>
+            </button>
+          </div>
+        </DashboardPanel>
 
-            <li>
-              ✓ Review disease
-              trends, maps and
-              predictions.
-            </li>
+        <DashboardPanel title="RECENT ALERTS" icon="bell" action="View All" onAction={() => {}}>
+          <div className="space-y-3">
+            {overview.recent_alerts?.length ? overview.recent_alerts.slice(0, 3).map((alert, index) => (
+              <div key={`${alert.title}-${index}`} className={`rounded-xl border p-3.5 ${alert.severity === "Critical" || alert.severity === "High" ? "border-[#F8DDE2] bg-[#FFF7F8]" : "border-[#F4E6CF] bg-[#FFFBF5]"}`}>
+                <div className="flex items-start gap-2.5">
+                  <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${alert.severity === "Critical" || alert.severity === "High" ? "bg-[#E11D48]" : "bg-[#F59E0B]"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[12px] font-semibold text-[#17233D] leading-5">{alert.title}</p>
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${alert.severity === "Critical" || alert.severity === "High" ? "bg-[#FFE5EA] text-[#D61F45]" : "bg-[#FFF0D9] text-[#B56A00]"}`}>{alert.severity}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-5 text-[#52627D]">{alert.message}</p>
+                    <p className="mt-2 text-[10px] text-[#687790]">{formatDateTime(alert.created_at)}</p>
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-xl border border-[#E7ECE9] bg-[#F9FBFA] p-5 text-center text-[12px] text-[#607080]">No active alerts for this surveillance scope.</div>
+            )}
+          </div>
+        </DashboardPanel>
 
-            <li>
-              ✓ Report agent
-              misconduct to Admin
-              for final action.
-            </li>
-          </ul>
-        </Panel>
+        <DashboardPanel title="WEEKLY COVERAGE" icon="target" action="View All" onAction={() => {}}>
+          <div className="flex items-center gap-4 px-1">
+            <div className="relative w-[122px] h-[122px] shrink-0">
+              <svg width="122" height="122" viewBox="0 0 126 126" className="-rotate-90">
+                <circle cx="63" cy="63" r="54" fill="none" stroke="#E7ECE9" strokeWidth="14" />
+                <circle cx="63" cy="63" r="54" fill="none" stroke="#159447" strokeWidth="14" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[26px] font-bold text-[#17233D]">{coverage}%</span>
+                <span className="text-[10px] text-[#687790]">Coverage</span>
+              </div>
+            </div>
+            <div className="space-y-3 text-[11px]">
+              <CoverageLine dot="bg-[#159447]" value={overview.coverage_received} label="Reports Received" />
+              <CoverageLine dot="bg-[#9AD8B2]" value={overview.coverage_pending} label="Pending Reports" />
+              <CoverageLine dot="bg-[#C7CDD3]" value={overview.coverage_no_report} label="No Report" />
+            </div>
+          </div>
+          <div className="mt-5 rounded-xl border border-[#E0EEE5] bg-[#F6FBF7] p-3.5">
+            <div className="flex items-start gap-2.5">
+              <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-[#159447]">✓</span>
+              <div>
+                <p className="text-[12px] font-semibold text-[#147A3E]">Reporting coverage</p>
+                <p className="mt-1 text-[11px] leading-5 text-[#42614F]">{coverage >= 80 ? "Coverage is above the 80% operational target." : "Coverage is below the 80% operational target."}</p>
+                <p className="mt-2 text-[10px] font-semibold text-[#42614F]">Target: 80%</p>
+              </div>
+            </div>
+          </div>
+        </DashboardPanel>
+      </section>
+
+      {/* Surveillance pulse */}
+      <DashboardPanel title="SURVEILLANCE PULSE" icon="pulse" action="View All Activity" onAction={() => {}}>
+        <div className="grid lg:grid-cols-4 gap-5 relative">
+          {overview.surveillance_pulse?.map((event, index) => (
+            <div key={`${event.title}-${index}`} className="relative min-h-[84px] pl-5">
+              {index < (overview.surveillance_pulse.length - 1) && <span className="hidden lg:block absolute left-[7px] top-2 bottom-[-18px] w-px bg-[#D9EBDD]" />}
+              <span className="absolute left-0 top-1.5 w-3 h-3 rounded-full bg-[#159447] border-[3px] border-[#EAF7EF]" />
+              <p className="text-[10px] font-semibold text-[#159447]">{formatDateTime(event.time)}</p>
+              <p className="mt-2 text-[12px] font-semibold text-[#17233D] leading-5">{event.title}</p>
+              <p className="mt-1 text-[11px] leading-5 text-[#52627D]">{event.detail}</p>
+              <p className="mt-1 text-[10px] text-[#687790]">{event.meta}</p>
+            </div>
+          ))}
+          <img
+            src={pulseIllustration}
+            alt=""
+            className="hidden xl:block absolute right-0 bottom-[-8px] w-[210px] h-auto opacity-75 pointer-events-none"
+          />
+        </div>
+      </DashboardPanel>
+    </div>
+  );
+}
+
+function AlertsView({ alerts = [] }) {
+  return (
+    <div className="rounded-[17px] border border-[#E7ECE9] bg-white p-5">
+      <div className="flex items-center gap-3 mb-5">
+        <span className="w-9 h-9 rounded-full bg-[#FFF0F2] text-[#E11D48] flex items-center justify-center"><Bell size={17} /></span>
+        <div>
+          <h3 className="text-[16px] font-semibold text-[#17233D]">Alerts</h3>
+          <p className="text-[12px] text-[#687790] mt-0.5">Recent surveillance alerts requiring attention.</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {alerts.length ? alerts.map((alert, index) => (
+          <div key={`${alert.title}-${index}`} className="rounded-xl border border-[#E7ECE9] p-4">
+            <div className="flex items-start gap-3">
+              <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${alert.severity === "High" || alert.severity === "Critical" ? "bg-[#E11D48]" : "bg-[#F59E0B]"}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[13px] font-semibold text-[#17233D]">{alert.title}</p>
+                  <span className="text-[10px] font-semibold text-[#687790]">{alert.severity}</span>
+                </div>
+                <p className="mt-1 text-[12px] leading-5 text-[#52627D]">{alert.message}</p>
+              </div>
+            </div>
+          </div>
+        )) : (
+          <div className="rounded-xl bg-[#F7FAF8] p-6 text-center text-[12px] text-[#687790]">No active alerts.</div>
+        )}
       </div>
     </div>
   );
 }
+
+function getSupervisorDisplayName() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem("kt_session") || "null");
+    return session?.full_name || session?.username || "Medical Supervisor";
+  } catch {
+    return "Medical Supervisor";
+  }
+}
+
+function ClockIcon() {
+  return <Clock3 size={16} className="text-[#52627D]" />;
+}
+
+function DashboardMetric({ icon, tone, label, value, helper }) {
+  const tones = {
+    green: { bg: "bg-[#E8F6ED]", text: "text-[#159447]" },
+    blue: { bg: "bg-[#E8F0FF]", text: "text-[#5B8DEF]" },
+    orange: { bg: "bg-[#FFF0DD]", text: "text-[#F59E0B]" },
+    purple: { bg: "bg-[#F0E9FF]", text: "text-[#8B5CF6]" },
+  };
+  const toneStyle = tones[tone] || tones.green;
+  return (
+    <div className="rounded-[17px] border border-[#E7ECE9] bg-white px-5 py-5 flex items-center gap-4 min-h-[116px]">
+      <div className={`w-14 h-14 rounded-full ${toneStyle.bg} ${toneStyle.text} flex items-center justify-center shrink-0`}>
+        {icon === "people" && <UsersIcon />}
+        {icon === "clipboard" && <ClipboardIcon />}
+        {icon === "alert" && <AlertIcon />}
+        {icon === "chart" && <ChartIcon />}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold text-[#17233D]">{label}</p>
+        <p className="mt-1 text-[28px] leading-none font-bold tracking-[-0.03em] text-[#101B38]">{value}</p>
+        <p className={`mt-2 text-[10px] font-medium ${tone === "orange" ? "text-[#D97706]" : tone === "purple" ? "text-[#6D4BC2]" : "text-[#159447]"}`}>{helper}</p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardPanel({ title, icon, action, onAction, children }) {
+  return (
+    <div className="rounded-[17px] border border-[#E7ECE9] bg-white px-5 py-4 shadow-[0_2px_8px_rgba(16,42,67,0.02)]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <span className="w-7 h-7 rounded-full bg-[#EAF7EF] text-[#159447] flex items-center justify-center">{icon === "virus" ? <Bug size={15} /> : icon === "bell" ? <Bell size={15} /> : icon === "target" ? <Target size={15} /> : <Activity size={15} />}</span>
+          <h3 className="text-[13px] font-semibold tracking-[0.01em] text-[#17233D]">{title}</h3>
+        </div>
+        {action && <button type="button" onClick={onAction} className="text-[11px] font-semibold text-[#087A32] hover:text-[#065F28]">{action} →</button>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CoverageLine({ dot, value, label }) {
+  return <div className="flex items-center gap-2.5"><span className={`w-3 h-3 rounded-full ${dot}`} /><span className="font-bold text-[#17233D] w-5">{value}</span><span className="text-[#687790]">{label}</span></div>;
+}
+
+function UsersIcon(){return <Users size={25} strokeWidth={2.1} />}
+function ClipboardIcon(){return <ClipboardList size={25} strokeWidth={2.1} />}
+function AlertIcon(){return <AlertTriangle size={25} strokeWidth={2.1} />}
+function ChartIcon(){return <ChartNoAxesCombined size={25} strokeWidth={2.1} />}
+
 
 // ============================================================
 // DISEASE REPORTS
@@ -2774,27 +2905,6 @@ function Panel({
       </div>
 
       {children}
-    </div>
-  );
-}
-
-// ============================================================
-// STAT
-// ============================================================
-
-function Stat({
-  label,
-  value,
-}) {
-  return (
-    <div className="bg-white border border-[#E3E9E5] rounded-2xl p-5">
-      <p className="text-[11px] uppercase tracking-[0.08em] text-[#8A93A3]">
-        {label}
-      </p>
-
-      <p className="text-[28px] font-bold text-[#087A32] mt-2">
-        {value}
-      </p>
     </div>
   );
 }

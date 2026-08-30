@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import engine
+from .database import engine, ensure_schema_compatibility
 from . import models
+from .feature_init import initialize_feature
 
 from .routers.auth_router import router as auth_router
 from .routers.locations import router as locations_router
@@ -21,6 +22,13 @@ from .routers.home_relief import router as home_relief_router
 models.Base.metadata.create_all(
     bind=engine
 )
+
+# Keep existing databases compatible with the current model definitions.
+ensure_schema_compatibility()
+
+# Ensure the Medical Supervisor feature registry/account exists without
+# reseeding or replacing existing surveillance data.
+initialize_feature()
 
 
 # ============================================================

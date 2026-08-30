@@ -7,19 +7,30 @@ import {
   MapPin,
   LogOut,
   ChevronDown,
+  Menu,
+  Bell,
+  CalendarDays,
+  MapPin as MapPinIcon,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+import medicalDoctor from "../assets/ui/medical-doctor.png";
+import medicalBrand from "../assets/ui/logo.png";
+import medicalSidebarCard from "../assets/ui/sidebar-card.png";
 
 export default function PortalShell({
-  title,
-  subtitle,
   tabs = [],
   activeTab,
   onTabChange,
   onExit,
   children,
   portalLabel,
+  variant = "default",
+  medicalLocation = "All monitored areas",
+  medicalLocations = [],
+  selectedMedicalLocation = "",
+  onMedicalLocationChange,
+  medicalAlertCount = 0,
 }) {
   const { session } = useAuth();
 
@@ -106,41 +117,77 @@ export default function PortalShell({
           TOP HEADER
       ========================================================= */}
 
-      <header className="fixed top-0 left-0 right-0 z-50 h-[70px] bg-white border-b border-[#E3E9E5]">
+      <header className="fixed top-0 left-0 right-0 z-50 h-[86px] bg-white border-b border-[#E3E9E5]">
 
-        <div className="h-full flex items-center justify-between">
+        <div className="h-full flex items-center justify-between relative">
+          {variant === "medical" && (
+            <button type="button" className="absolute left-[302px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center text-[#17233D] hover:bg-[#F5F8F6]" aria-label="Open navigation">
+              <Menu size={23} />
+            </button>
+          )}
 
           {/* =====================================================
               BRAND
           ===================================================== */}
 
-          <div className="w-[239px] h-full flex items-center px-5 border-r border-[#E3E9E5] bg-white">
-
+          <div className={`${variant === "medical" ? "w-[281px]" : "w-[239px]"} h-full flex items-center px-6 border-r border-[#E3E9E5] bg-white`}>
             <div className="flex items-center gap-3">
-
-              <div className="w-9 h-9 rounded-xl bg-[#EAF6EE] flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-[#087A32]" />
-              </div>
-
+              {variant === "medical" ? (
+                <div className="relative w-[40px] h-[50px] shrink-0 overflow-hidden">
+                  <img
+                    src={medicalBrand}
+                    alt="Medical Supervisor"
+                    className="absolute left-0 top-0 h-[50px] w-auto max-w-none"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-[#159447] flex items-center justify-center shadow-sm">
+                  <span className="text-white font-bold text-xl">+</span>
+                </div>
+              )}
               <div>
-                <h1 className="text-[17px] leading-none font-bold text-[#087A32]">
-                  Karna Suraksha
+                <h1 className="text-[17px] leading-none font-bold text-[#17233D]">
+                  {variant === "medical" ? "MEDICAL SUPERVISOR" : "Karna Suraksha"}
                 </h1>
-
-                <p className="text-[10px] text-[#607080] mt-1">
-                  Disease Surveillance System
+                <p className="text-[11px] text-[#52627D] mt-1">
+                  {variant === "medical" ? "Surveillance System" : "Disease Surveillance System"}
                 </p>
               </div>
-
             </div>
-
           </div>
 
           {/* =====================================================
               HEADER RIGHT / PROFILE
           ===================================================== */}
 
-          <div className="flex items-center gap-4 px-6">
+          <div className="flex items-center gap-4 px-5">
+
+            {variant === "medical" && (
+              <>
+                <div className="hidden lg:flex items-center gap-2 rounded-xl border border-[#E2E7E4] bg-white px-3.5 py-2.5 text-[12px] font-semibold text-[#17233D]">
+                  <MapPinIcon size={17} className="text-[#17233D]" />
+                  <select
+                    value={selectedMedicalLocation}
+                    title={medicalLocation}
+                    onChange={(e) => onMedicalLocationChange?.(e.target.value)}
+                    className="bg-transparent outline-none cursor-pointer"
+                  >
+                    <option value="">All monitored areas</option>
+                    {medicalLocations.map((location) => (
+                      <option key={location.taluk_id} value={location.taluk_id}>{location.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="hidden lg:flex items-center gap-2 rounded-xl border border-[#E2E7E4] px-3.5 py-2.5 text-[12px] font-semibold text-[#17233D]">
+                  <CalendarDays size={16} />
+                  {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "long", year: "numeric" }).format(new Date())}
+                </div>
+                <button type="button" className="relative w-10 h-10 rounded-xl flex items-center justify-center hover:bg-[#F6F8F7]">
+                  <Bell size={20} className="text-[#17233D]" />
+                  {medicalAlertCount > 0 && <span className="absolute right-1 top-0 min-w-5 h-5 px-1 rounded-full bg-[#E11D48] text-white text-[9px] font-bold flex items-center justify-center">{medicalAlertCount}</span>}
+                </button>
+              </>
+            )}
 
             <div
               ref={profileRef}
@@ -159,12 +206,12 @@ export default function PortalShell({
 
                 {/* Avatar */}
 
-                <div className="w-9 h-9 rounded-full bg-[#EAF6EE] border border-[#D7EDE0] flex items-center justify-center">
-
-                  <span className="text-[11px] font-bold text-[#087A32]">
-                    {initials}
-                  </span>
-
+                <div className="w-9 h-9 rounded-full bg-[#EAF6EE] border border-[#D7EDE0] flex items-center justify-center overflow-hidden">
+                  {variant === "medical" ? (
+                    <img src={medicalDoctor} alt="Medical supervisor" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[11px] font-bold text-[#087A32]">{initials}</span>
+                  )}
                 </div>
 
                 {/* Name */}
@@ -176,7 +223,7 @@ export default function PortalShell({
                   </p>
 
                   <p className="text-[10px] text-[#718096] mt-0.5">
-                    Agent
+                    {variant === "medical" ? "Medical Supervisor" : "Agent"}
                   </p>
 
                 </div>
@@ -205,12 +252,12 @@ export default function PortalShell({
 
                     <div className="flex items-center gap-3">
 
-                      <div className="w-11 h-11 rounded-full bg-[#EAF6EE] border border-[#D7EDE0] flex items-center justify-center">
-
-                        <span className="text-[13px] font-bold text-[#087A32]">
-                          {initials}
-                        </span>
-
+                      <div className="w-11 h-11 rounded-full bg-[#EAF6EE] border border-[#D7EDE0] flex items-center justify-center overflow-hidden">
+                        {variant === "medical" ? (
+                          <img src={medicalDoctor} alt="Medical supervisor" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[13px] font-bold text-[#087A32]">{initials}</span>
+                        )}
                       </div>
 
                       <div className="min-w-0">
@@ -347,7 +394,7 @@ export default function PortalShell({
           SIDEBAR
       ========================================================= */}
 
-      <aside className="fixed left-0 top-[70px] bottom-0 w-[239px] bg-[#006B2D] text-white z-40">
+      <aside className={`fixed left-0 top-[86px] bottom-0 ${variant === "medical" ? "w-[281px] bg-white text-[#17233D] border-r border-[#E5EAE7]" : "w-[239px] bg-[#006B2D] text-white"} z-40`}>
 
         <div className="h-full flex flex-col">
 
@@ -355,11 +402,13 @@ export default function PortalShell({
               SIDEBAR CONTENT
           ===================================================== */}
 
-          <div className="px-4 pt-7">
+          <div className={`flex-1 min-h-0 overflow-y-auto px-4 pt-7 pb-4 ${variant === "medical" ? "pr-4" : ""}`}>
 
-            <p className="px-3 text-[11px] uppercase tracking-[0.08em] font-bold text-white/85 mb-4">
-              {portalLabel || "Agent Portal"}
-            </p>
+            {variant !== "medical" && (
+              <p className="px-3 text-[10px] uppercase tracking-[0.12em] font-bold text-white/85 mb-4">
+                {portalLabel || "Agent Portal"}
+              </p>
+            )}
 
 
             {/* ===================================================
@@ -368,7 +417,14 @@ export default function PortalShell({
 
             <div className="space-y-1.5">
 
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
+
+                const medicalSection = variant === "medical"
+                  ? (tab.key === "reports" ? "SURVEILLANCE"
+                    : tab.key === "agents" ? "REVIEW & RESPONSE"
+                    : tab.key === "home-relief" ? "MEDICAL CONTENT"
+                    : null)
+                  : null;
 
                 const Icon = getTabIcon(tab);
 
@@ -376,14 +432,18 @@ export default function PortalShell({
                   activeTab === tab.key;
 
                 return (
-                  <button
+                  <div key={tab.key}>
+                    {medicalSection && index !== 0 && (
+                      <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-[0.12em] font-bold text-[#7B8798]">{medicalSection}</p>
+                    )}
+                    <button
                     key={tab.key}
                     type="button"
                     onClick={() => onTabChange?.(tab.key)}
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition ${
                       isActive
-                        ? "bg-[#0B8F45] text-white shadow-sm"
-                        : "text-white/90 hover:bg-white/10"
+                        ? (variant === "medical" ? "bg-[#E7F4EA] text-[#087A32]" : "bg-[#0B8F45] text-white shadow-sm")
+                        : (variant === "medical" ? "text-[#17233D] hover:bg-[#F5F8F6]" : "text-white/90 hover:bg-white/10")
                     }`}
                   >
 
@@ -393,7 +453,8 @@ export default function PortalShell({
                       {tab.label}
                     </span>
 
-                  </button>
+                    </button>
+                  </div>
                 );
               })}
 
@@ -406,61 +467,36 @@ export default function PortalShell({
               SIDEBAR BOTTOM
           ===================================================== */}
 
-          <div className="mt-auto">
-
-            {/* Decorative illustration */}
-
-            <div className="relative h-[220px] overflow-hidden opacity-25">
-
-              <div className="absolute left-[34px] bottom-[45px] w-[92px] h-[72px] rounded-t-[48px] bg-white/30" />
-
-              <div className="absolute left-[20px] bottom-[20px] w-[125px] h-[48px] rounded-t-[55px] bg-white/30" />
-
-              <div className="absolute left-[67px] bottom-[88px] w-[30px] h-[30px] border-[7px] border-white/40 rounded-md" />
-
-              <div className="absolute left-[78px] bottom-[91px] w-[8px] h-[24px] bg-white/40 rounded" />
-
-              <div className="absolute left-[70px] bottom-[99px] w-[24px] h-[8px] bg-white/40 rounded" />
-
+          {variant === "medical" ? (
+            <div className="shrink-0 px-5 pt-2 pb-4 bg-white">
+              <img
+                src={medicalSidebarCard}
+                alt="Better surveillance. Stronger communities. Healthier tomorrow."
+                className="w-full h-auto rounded-[12px] block"
+              />
             </div>
-
-
-            {/* Quote */}
-
-            <div className="px-5 pb-5">
-
-              <div className="border-b border-white/20 pb-5">
-
-                <p className="text-[13px] leading-[1.8] italic text-white/90">
-                  “Early reporting,
-                  <br />
-                  stronger protection.
-                  <br />
-                  Together for a
-                  <br />
-                  healthier community.”
-                </p>
-
+          ) : (
+            <div className="mt-auto">
+              <div className="relative h-[220px] overflow-hidden opacity-25">
+                <div className="absolute left-[34px] bottom-[45px] w-[92px] h-[72px] rounded-t-[48px] bg-white/30" />
+                <div className="absolute left-[20px] bottom-[20px] w-[125px] h-[48px] rounded-t-[55px] bg-white/30" />
+                <div className="absolute left-[67px] bottom-[88px] w-[30px] h-[30px] border-[7px] border-white/40 rounded-md" />
+                <div className="absolute left-[78px] bottom-[91px] w-[8px] h-[24px] bg-white/40 rounded" />
+                <div className="absolute left-[70px] bottom-[99px] w-[24px] h-[8px] bg-white/40 rounded" />
               </div>
-
+              <div className="px-5 pb-5">
+                <div className="border-b border-white/20 pb-5">
+                  <p className="text-[13px] leading-[1.8] italic text-white/90">
+                    “Early reporting,<br />stronger protection.<br />Together for a<br />healthier community.”
+                  </p>
+                </div>
+              </div>
+              <div className="px-5 pb-5">
+                <p className="text-[10px] text-white/90">© 2026 Karna Suraksha</p>
+                <p className="text-[10px] text-white/90 mt-1">All rights reserved.</p>
+              </div>
             </div>
-
-
-            {/* Copyright */}
-
-            <div className="px-5 pb-5">
-
-              <p className="text-[10px] text-white/90">
-                © 2026 Karna Suraksha
-              </p>
-
-              <p className="text-[10px] text-white/90 mt-1">
-                All rights reserved.
-              </p>
-
-            </div>
-
-          </div>
+          )}
 
         </div>
 
@@ -471,7 +507,7 @@ export default function PortalShell({
           MAIN CONTENT
       ========================================================= */}
 
-      <main className="pt-[70px] pl-[239px] min-h-screen">
+      <main className={`pt-[86px] ${variant === "medical" ? "pl-[281px] bg-[#FCFDFC]" : "pl-[239px]"} min-h-screen`}>
 
         <div className="px-8 md:px-10 lg:px-12 py-8">
 

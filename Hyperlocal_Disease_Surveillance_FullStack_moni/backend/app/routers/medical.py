@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas, auth
 from ..database import get_db
+from ..utils import current_week_number
 
 
 router = APIRouter(
@@ -51,108 +52,951 @@ def _serialize_emerging(report):
 
 @router.get("/overview")
 def medical_overview(
+    taluk_id: Optional[int] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    current_week = datetime.utcnow().isocalendar().week
+    """Return the dashboard data used by the Medical Supervisor home screen.
 
-    total_agents = (
-        db.query(models.Agent)
-        .count()
+    All headline values are calculated from the surveillance database rather
+    than being presentation/demo constants. The optional taluk_id scopes the
+    dashboard to one monitored taluk; when omitted, the dashboard covers all
+    monitored agent assignments.
+    """
+
+    now = datetime.utcnow()
+    current_week = current_week_number(now)
+    previous_week = current_week_number(
+        now - timedelta(days=7)
     )
 
-    active_agents = (
+    # --------------------------------------------------------
+    # Monitored locations
+    # --------------------------------------------------------
+
+    agents_query = (
         db.query(models.Agent)
         .join(
             models.User,
             models.Agent.user_id == models.User.id,
         )
+        .join(
+            models.Taluk,
+            models.Agent.taluk_id == models.Taluk.id,
+        )
         .filter(
             models.User.is_active.is_(True)
         )
-        .count()
+        .order_by(
+            models.Taluk.name.asc()
+        )
     )
 
-    total_taluks = (
-        db.query(models.Taluk)
-        .count()
+    agents = agents_query.all()
+
+    locations = []
+
+    for agent in agents:
+
+        if not agent.taluk:
+            continue
+
+        district = (
+            agent.taluk.district.name
+            if agent.taluk.district
+            else "Unknown District"
+        )
+
+        locations.append(
+            {
+                "taluk_id": agent.taluk_id,
+                "taluk_name": agent.taluk.name,
+                "district_name": district,
+                "label": (
+                    f"{agent.taluk.name}, "
+                    f"{district}"
+                ),
+            }
+        )
+
+    # Avoid duplicate locations.
+    locations = list(
+        {
+            item["taluk_id"]: item
+            for item in locations
+        }.values()
     )
 
-    total_reports = (
-        db.query(models.DiseaseReport)
-        .count()
+    locations.sort(
+        key=lambda item: item["label"].lower()
     )
 
-    reports_this_week = (
-        db.query(models.DiseaseReport)
-        .filter(
+    selected_location = None
+
+    if taluk_id is not None:
+
+        selected_location = next(
+            (
+                item
+                for item in locations
+                if item["taluk_id"] == taluk_id
+            ),
+            None,
+        )
+
+        if selected_location is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Monitored taluk not found.",
+            )
+
+    # --------------------------------------------------------
+    # Base filters
+    # --------------------------------------------------------
+
+    def scoped_query(query):
+
+        if taluk_id is not None:
+            return query.filter(
+                models.DiseaseReport.taluk_id
+                == taluk_id
+            )
+
+        return query
+
+    current_reports_query = scoped_query(
+        db.query(
+            models.DiseaseReport
+        ).filter(
             models.DiseaseReport.week_number
             == current_week
         )
-        .count()
     )
 
-    submitted_agents = (
-        db.query(models.DiseaseReport.agent_id)
-        .filter(
+    previous_reports_query = scoped_query(
+        db.query(
+            models.DiseaseReport
+        ).filter(
             models.DiseaseReport.week_number
+            == previous_week
+        )
+    )
+
+    current_reports = (
+        current_reports_query.all()
+    )
+
+    previous_reports = (
+        previous_reports_query.all()
+    )
+
+    # --------------------------------------------------------
+    # Agents / reporting coverage
+    # --------------------------------------------------------
+
+    if taluk_id is not None:
+
+        scoped_agents = [
+            agent
+            for agent in agents
+            if agent.taluk_id == taluk_id
+        ]
+
+    else:
+
+        scoped_agents = agents
+
+    active_agents = len(
+        scoped_agents
+    )
+
+    submitted_agent_ids = {
+        report.agent_id
+        for report in current_reports
+        if report.agent_id is not None
+    }
+
+    submitted_agents = sum(
+        1
+        for agent in scoped_agents
+        if agent.id in submitted_agent_ids
+    )
+
+    pending_submissions = max(
+        0,
+        active_agents - submitted_agents,
+    )
+
+    coverage_percent = (
+        round(
+            (
+                submitted_agents
+                / active_agents
+            )
+            * 100
+        )
+        if active_agents
+        else 0
+    )
+
+    # --------------------------------------------------------
+    # Disease overview
+    # --------------------------------------------------------
+
+    current_by_disease = {}
+    previous_by_disease = {}
+
+    for report in current_reports:
+
+        current_by_disease[
+            report.disease
+        ] = (
+            current_by_disease.get(
+                report.disease,
+                0,
+            )
+            + (
+                report.cases
+                or 0
+            )
+        )
+
+    for report in previous_reports:
+
+        previous_by_disease[
+            report.disease
+        ] = (
+            previous_by_disease.get(
+                report.disease,
+                0,
+            )
+            + (
+                report.cases
+                or 0
+            )
+        )
+
+    # --------------------------------------------------------
+    # Predictions / risk
+    # --------------------------------------------------------
+
+    prediction_query = (
+        db.query(
+            models.Prediction
+        ).filter(
+            models.Prediction.week_number
             == current_week
         )
-        .distinct()
-        .count()
     )
+
+    if taluk_id is not None:
+
+        prediction_query = (
+            prediction_query.filter(
+                models.Prediction.taluk_id
+                == taluk_id
+            )
+        )
+
+    predictions = (
+        prediction_query.all()
+    )
+
+    # IMPORTANT:
+    #
+    # Prediction has taluk_id but does NOT have
+    # a .taluk relationship.
+    #
+    # Therefore we explicitly load the related
+    # Taluk records here.
+    #
+    # This fixes:
+    #
+    # AttributeError:
+    # 'Prediction' object has no attribute 'taluk'
+    #
+
+    prediction_taluk_ids = {
+        prediction.taluk_id
+        for prediction in predictions
+        if prediction.taluk_id is not None
+    }
+
+    prediction_taluks = {}
+
+    if prediction_taluk_ids:
+
+        prediction_taluks = {
+            taluk.id: taluk
+            for taluk in (
+                db.query(
+                    models.Taluk
+                )
+                .filter(
+                    models.Taluk.id.in_(
+                        prediction_taluk_ids
+                    )
+                )
+                .all()
+            )
+        }
+
+    risk_rank = {
+        "Low": 1,
+        "Moderate": 2,
+        "High": 3,
+        "Critical": 4,
+    }
+
+    risk_by_disease = {}
+
+    prediction_by_disease = {}
+
+    for prediction in predictions:
+
+        current = (
+            risk_by_disease.get(
+                prediction.disease
+            )
+        )
+
+        if (
+            current is None
+            or
+            risk_rank.get(
+                prediction.risk_level,
+                0,
+            )
+            >
+            risk_rank.get(
+                current,
+                0,
+            )
+        ):
+
+            risk_by_disease[
+                prediction.disease
+            ] = (
+                prediction.risk_level
+                or "Low"
+            )
+
+        prediction_by_disease.setdefault(
+            prediction.disease,
+            [],
+        ).append(
+            prediction
+        )
+
+    disease_names = sorted(
+        set(current_by_disease)
+        |
+        set(previous_by_disease)
+    )
+
+    disease_overview = []
+
+    for disease in disease_names:
+
+        current_cases = (
+            current_by_disease.get(
+                disease,
+                0,
+            )
+        )
+
+        previous_cases = (
+            previous_by_disease.get(
+                disease,
+                0,
+            )
+        )
+
+        if previous_cases:
+
+            change_percent = round(
+                (
+                    (
+                        current_cases
+                        - previous_cases
+                    )
+                    / previous_cases
+                )
+                * 100
+            )
+
+        elif current_cases:
+
+            change_percent = 100
+
+        else:
+
+            change_percent = 0
+
+        risk_level = (
+            risk_by_disease.get(
+                disease,
+                "Low",
+            )
+        )
+
+        if risk_level in {
+            "Critical",
+            "High",
+        }:
+
+            status = "Watch"
+
+        elif risk_level == "Moderate":
+
+            status = "Monitor"
+
+        else:
+
+            status = "Stable"
+
+        disease_overview.append(
+            {
+                "disease": disease,
+                "cases_this_week": current_cases,
+                "previous_cases": previous_cases,
+                "change_percent": change_percent,
+                "risk_level": risk_level,
+                "status": status,
+            }
+        )
+
+    disease_overview.sort(
+        key=lambda item: item[
+            "cases_this_week"
+        ],
+        reverse=True,
+    )
+
+    # --------------------------------------------------------
+    # Risk alerts
+    # --------------------------------------------------------
+
+    high_risk_predictions = [
+        prediction
+        for prediction in predictions
+        if prediction.risk_level
+        in {
+            "Critical",
+            "High",
+        }
+    ]
+
+    high_risk_predictions.sort(
+        key=lambda prediction: (
+            risk_rank.get(
+                prediction.risk_level,
+                0,
+            ),
+            prediction.predicted_cases
+            or 0,
+        ),
+        reverse=True,
+    )
+
+    recent_alerts = []
+
+    seen_alerts = set()
+
+    for prediction in high_risk_predictions:
+
+        key = (
+            prediction.taluk_id,
+            prediction.disease,
+        )
+
+        if key in seen_alerts:
+            continue
+
+        seen_alerts.add(key)
+
+        # IMPORTANT:
+        #
+        # Do NOT use:
+        #
+        # prediction.taluk
+        #
+        # because Prediction has no taluk relationship.
+        #
+        # Use the explicitly loaded lookup map.
+
+        taluk = prediction_taluks.get(
+            prediction.taluk_id
+        )
+
+        place = (
+            taluk.name
+            if taluk
+            else "Unknown Taluk"
+        )
+
+        if (
+            taluk_id is not None
+            and selected_location
+        ):
+
+            place = (
+                selected_location[
+                    "taluk_name"
+                ]
+            )
+
+        current_cases = (
+            prediction.current_cases
+            or 0
+        )
+
+        predicted_cases = (
+            prediction.predicted_cases
+            or 0
+        )
+
+        trend_text = (
+            prediction.trend
+            or "stable"
+        ).lower()
+
+        message = (
+            f"{prediction.disease} is "
+            f"{prediction.risk_level.lower()} "
+            f"risk in {place}. "
+            f"Current cases: "
+            f"{current_cases}; "
+            f"predicted: "
+            f"{predicted_cases}. "
+            f"Trend: "
+            f"{trend_text}."
+        )
+
+        recent_alerts.append(
+            {
+                "type": "risk",
+                "severity": (
+                    prediction.risk_level
+                ),
+                "title": (
+                    f"{prediction.risk_level} "
+                    f"{prediction.disease} "
+                    f"activity in {place}"
+                ),
+                "message": message,
+                "created_at": (
+                    prediction.created_at
+                ),
+                "taluk_name": place,
+                "disease": (
+                    prediction.disease
+                ),
+            }
+        )
+
+        if len(recent_alerts) >= 3:
+            break
+
+    # --------------------------------------------------------
+    # Missed weekly submissions
+    # --------------------------------------------------------
+
+    if pending_submissions:
+
+        missing_names = [
+            agent.user.full_name
+            for agent in scoped_agents
+            if agent.id
+            not in submitted_agent_ids
+        ]
+
+        label = (
+            (
+                f"{len(missing_names)} "
+                f"agent missed the weekly report"
+            )
+            if len(missing_names) == 1
+            else
+            (
+                f"{len(missing_names)} "
+                f"agents missed weekly reports"
+            )
+        )
+
+        recent_alerts.append(
+            {
+                "type": "reporting",
+                "severity": "Medium",
+                "title": label,
+                "message": (
+                    "Follow-up is required "
+                    "for timely surveillance "
+                    "reporting."
+                ),
+                "created_at": now,
+                "taluk_name": (
+                    selected_location[
+                        "taluk_name"
+                    ]
+                    if selected_location
+                    else None
+                ),
+                "disease": None,
+            }
+        )
+
+    # --------------------------------------------------------
+    # Emerging disease reviews
+    # --------------------------------------------------------
 
     pending_emerging = (
-        db.query(models.EmergingDiseaseReport)
-        .filter(
+        db.query(
+            models.EmergingDiseaseReport
+        ).filter(
             models.EmergingDiseaseReport.status
             == "PENDING"
         )
-        .count()
     )
 
-    pending_agent_issues = (
-        db.query(models.AgentIssueReport)
-        .filter(
-            models.AgentIssueReport.status
-            == "PENDING_ADMIN_REVIEW"
+    if taluk_id is not None:
+
+        pending_emerging = (
+            pending_emerging.filter(
+                models.EmergingDiseaseReport.taluk_id
+                == taluk_id
+            )
         )
-        .count()
+
+    pending_emerging_count = (
+        pending_emerging.count()
     )
 
-    disease_count = (
-        db.query(models.Disease)
-        .filter(
-            models.Disease.is_active.is_(True)
+    if pending_emerging_count:
+
+        recent_alerts.append(
+            {
+                "type": "emerging",
+                "severity": "High",
+                "title": (
+                    f"{pending_emerging_count} "
+                    f"emerging disease review"
+                    +
+                    (
+                        "s"
+                        if pending_emerging_count
+                        != 1
+                        else ""
+                    )
+                ),
+                "message": (
+                    "Suspected disease reports "
+                    "are awaiting Medical "
+                    "Supervisor review."
+                ),
+                "created_at": now,
+                "taluk_name": (
+                    selected_location[
+                        "taluk_name"
+                    ]
+                    if selected_location
+                    else None
+                ),
+                "disease": None,
+            }
         )
-        .count()
+
+    # --------------------------------------------------------
+    # Surveillance pulse
+    # --------------------------------------------------------
+
+    pulse = []
+
+    latest_report = (
+        current_reports_query
+        .order_by(
+            models.DiseaseReport.created_at.desc()
+        )
+        .first()
     )
 
-    pending_home_reliefs = (
-        db.query(models.HomeReliefRemedy)
-        .filter(
-            models.HomeReliefRemedy.status
-            == "PENDING"
+    if latest_report:
+
+        agent_name = (
+            latest_report.agent.user.full_name
+            if (
+                latest_report.agent
+                and latest_report.agent.user
+            )
+            else "Agent"
         )
-        .count()
+
+        pulse.append(
+            {
+                "time": (
+                    latest_report.created_at
+                ),
+                "title": (
+                    "Disease report submitted"
+                ),
+                "detail": (
+                    f"{agent_name} submitted "
+                    f"{latest_report.disease} "
+                    "surveillance data."
+                ),
+                "meta": (
+                    f"{latest_report.cases or 0} "
+                    f"cases · "
+                    f"{
+                        latest_report.taluk.name
+                        if latest_report.taluk
+                        else 'Unknown Taluk'
+                    }"
+                ),
+                "kind": "report",
+            }
+        )
+
+    latest_risk = (
+        high_risk_predictions[0]
+        if high_risk_predictions
+        else None
+    )
+
+    if latest_risk:
+
+        # IMPORTANT:
+        #
+        # Prediction does not have .taluk.
+        # Resolve the Taluk using taluk_id.
+
+        latest_risk_taluk = (
+            prediction_taluks.get(
+                latest_risk.taluk_id
+            )
+        )
+
+        latest_risk_taluk_name = (
+            latest_risk_taluk.name
+            if latest_risk_taluk
+            else "Unknown Taluk"
+        )
+
+        pulse.append(
+            {
+                "time": (
+                    latest_risk.created_at
+                ),
+                "title": (
+                    "Risk level updated"
+                ),
+                "detail": (
+                    f"{latest_risk.disease} "
+                    f"classified as "
+                    f"{latest_risk.risk_level} "
+                    "risk."
+                ),
+                "meta": (
+                    f"Predicted "
+                    f"{latest_risk.predicted_cases or 0} "
+                    f"cases · "
+                    f"{latest_risk_taluk_name}"
+                ),
+                "kind": "risk",
+            }
+        )
+
+    if active_agents:
+
+        pulse.append(
+            {
+                "time": (
+                    latest_report.created_at
+                    if latest_report
+                    else now
+                ),
+                "title": (
+                    "Weekly reporting coverage"
+                ),
+                "detail": (
+                    f"{submitted_agents} of "
+                    f"{active_agents} active "
+                    "monitored agents have "
+                    "submitted this week."
+                ),
+                "meta": (
+                    f"{coverage_percent}% coverage"
+                ),
+                "kind": "coverage",
+            }
+        )
+
+    if pending_emerging_count:
+
+        pulse.append(
+            {
+                "time": now,
+                "title": (
+                    "Emerging disease report received"
+                ),
+                "detail": (
+                    f"{pending_emerging_count} "
+                    "suspected report(s) require "
+                    "medical review."
+                ),
+                "meta": "Pending review",
+                "kind": "emerging",
+            }
+        )
+
+    # --------------------------------------------------------
+    # Deduplicate pulse
+    # --------------------------------------------------------
+
+    unique_pulse = []
+
+    seen = set()
+
+    for item in pulse:
+
+        if item["title"] in seen:
+            continue
+
+        seen.add(
+            item["title"]
+        )
+
+        unique_pulse.append(
+            item
+        )
+
+    pulse = unique_pulse[:4]
+
+    # --------------------------------------------------------
+    # Headline metrics
+    # --------------------------------------------------------
+
+    total_cases_this_week = sum(
+        current_by_disease.values()
+    )
+
+    total_cases_previous_week = sum(
+        previous_by_disease.values()
+    )
+
+    high_risk_alerts = len(
+        high_risk_predictions
+    )
+
+    reports_this_week = len(
+        current_reports
     )
 
     return {
         "current_week": current_week,
-        "total_agents": total_agents,
-        "active_agents": active_agents,
-        "total_taluks": total_taluks,
-        "total_reports": total_reports,
-        "reports_this_week": reports_this_week,
-        "submitted_agents_this_week": submitted_agents,
-        "pending_agent_submissions": max(
-            0,
-            total_agents - submitted_agents,
+        "current_week_label": (
+            f"Week {current_week % 100}"
         ),
-        "pending_emerging_reviews": pending_emerging,
-        "pending_agent_issue_reports": pending_agent_issues,
-        "diseases_tracked": disease_count,
-        "pending_home_reliefs": pending_home_reliefs,
+        "previous_week": previous_week,
+
+        "active_agents": active_agents,
+        "total_agents": active_agents,
+
+        "total_taluks": (
+            len(locations)
+            if taluk_id is None
+            else (
+                1
+                if selected_location
+                else 0
+            )
+        ),
+
+        "total_reports": (
+            db.query(
+                models.DiseaseReport
+            ).count()
+        ),
+
+        "reports_this_week": (
+            reports_this_week
+        ),
+
+        "submitted_agents_this_week": (
+            submitted_agents
+        ),
+
+        "pending_agent_submissions": (
+            pending_submissions
+        ),
+
+        "pending_emerging_reviews": (
+            pending_emerging_count
+        ),
+
+        "pending_agent_issue_reports": (
+            db.query(
+                models.AgentIssueReport
+            )
+            .filter(
+                models.AgentIssueReport.status
+                == "PENDING_ADMIN_REVIEW"
+            )
+            .count()
+        ),
+
+        "diseases_tracked": len(
+            disease_names
+        ),
+
+        "total_cases_this_week": (
+            total_cases_this_week
+        ),
+
+        "total_cases_previous_week": (
+            total_cases_previous_week
+        ),
+
+        "high_risk_alerts": (
+            high_risk_alerts
+        ),
+
+        "reporting_coverage_percent": (
+            coverage_percent
+        ),
+
+        "coverage_received": (
+            submitted_agents
+        ),
+
+        "coverage_pending": (
+            pending_submissions
+        ),
+
+        "coverage_no_report": max(
+            0,
+            active_agents
+            - submitted_agents
+            - pending_submissions,
+        ),
+
+        "locations": locations,
+
+        "selected_location": (
+            selected_location
+        ),
+
+        "disease_overview": (
+            disease_overview
+        ),
+
+        "recent_alerts": (
+            recent_alerts[:5]
+        ),
+
+        "surveillance_pulse": (
+            pulse
+        ),
     }
 
 
@@ -176,7 +1020,9 @@ def medical_reports(
     )
 
     query = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .join(
             models.Taluk,
             models.DiseaseReport.taluk_id
@@ -190,24 +1036,40 @@ def medical_reports(
     )
 
     if taluk_id is not None:
+
         query = query.filter(
             models.DiseaseReport.taluk_id
             == taluk_id
         )
 
     if disease:
+
         query = query.filter(
             models.DiseaseReport.disease
             == disease
         )
 
     if week_number is not None:
-        query = query.filter(
-            models.DiseaseReport.week_number
-            == week_number
-        )
+
+        if 1 <= week_number <= 53:
+
+            query = query.filter(
+                (
+                    models.DiseaseReport.week_number
+                    % 100
+                )
+                == week_number
+            )
+
+        else:
+
+            query = query.filter(
+                models.DiseaseReport.week_number
+                == week_number
+            )
 
     if year is not None:
+
         query = query.filter(
             models.DiseaseReport.year
             == year
@@ -226,40 +1088,54 @@ def medical_reports(
 
     return [
         {
-            "id": r.id,
-            "agent_id": r.agent_id,
+            "id": report.id,
+            "agent_id": report.agent_id,
             "agent_name": (
-                r.agent.user.full_name
-                if r.agent and r.agent.user
+                report.agent.user.full_name
+                if (
+                    report.agent
+                    and report.agent.user
+                )
                 else "Unknown Agent"
             ),
-            "taluk_id": r.taluk_id,
+            "taluk_id": report.taluk_id,
             "taluk_name": (
-                r.taluk.name
-                if r.taluk
+                report.taluk.name
+                if report.taluk
                 else "Unknown Taluk"
             ),
             "district_id": (
-                r.taluk.district_id
-                if r.taluk
+                report.taluk.district_id
+                if report.taluk
                 else None
             ),
             "district_name": (
-                r.taluk.district.name
-                if r.taluk and r.taluk.district
+                report.taluk.district.name
+                if (
+                    report.taluk
+                    and report.taluk.district
+                )
                 else "Unknown District"
             ),
-            "disease": r.disease,
-            "cases": r.cases or 0,
-            "severity": r.severity,
-            "remarks": r.remarks,
-            "preventive_measures": r.preventive_measures,
-            "week_number": r.week_number,
-            "year": r.year,
-            "created_at": r.created_at,
-            "updated_at": r.updated_at,
+            "disease": report.disease,
+            "cases": report.cases or 0,
+            "severity": report.severity,
+            "remarks": report.remarks,
+            "preventive_measures": (
+                report.preventive_measures
+            ),
+            "week_number": (
+                report.week_number
+            ),
+            "year": report.year,
+            "created_at": (
+                report.created_at
+            ),
+            "updated_at": (
+                report.updated_at
+            ),
         }
-        for r in reports
+        for report in reports
     ]
 
 
@@ -275,11 +1151,13 @@ def medical_monitoring(
 ):
     week = (
         week_number
-        or datetime.utcnow().isocalendar().week
+        or current_week_number()
     )
 
     agents = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .join(
             models.User,
             models.Agent.user_id
@@ -296,7 +1174,9 @@ def medical_monitoring(
     for agent in agents:
 
         submitted = (
-            db.query(models.DiseaseReport.id)
+            db.query(
+                models.DiseaseReport.id
+            )
             .filter(
                 models.DiseaseReport.agent_id
                 == agent.id,
@@ -310,9 +1190,15 @@ def medical_monitoring(
         rows.append(
             {
                 "agent_id": agent.id,
-                "agent_name": agent.user.full_name,
-                "username": agent.user.username,
-                "taluk_id": agent.taluk_id,
+                "agent_name": (
+                    agent.user.full_name
+                ),
+                "username": (
+                    agent.user.username
+                ),
+                "taluk_id": (
+                    agent.taluk_id
+                ),
                 "taluk_name": (
                     agent.taluk.name
                     if agent.taluk
@@ -320,8 +1206,10 @@ def medical_monitoring(
                 ),
                 "district_name": (
                     agent.taluk.district.name
-                    if agent.taluk
-                    and agent.taluk.district
+                    if (
+                        agent.taluk
+                        and agent.taluk.district
+                    )
                     else "Unknown District"
                 ),
                 "is_active": bool(
@@ -458,60 +1346,17 @@ def medical_analytics(
         .all()
     )
 
-    taluk_totals = (
-        db.query(
-            models.DiseaseReport.taluk_id,
-            func.coalesce(
-                func.sum(
-                    models.DiseaseReport.cases
-                ),
-                0,
-            ),
-        )
-        .group_by(
-            models.DiseaseReport.taluk_id
-        )
-        .order_by(
-            func.sum(
-                models.DiseaseReport.cases
-            ).desc()
-        )
-        .all()
-    )
-
-    taluk_lookup = {
-        t.id: t
-        for t in db.query(
-            models.Taluk
-        ).all()
-    }
-
     return {
-        "weekly": weekly,
-
+        "weeks": weekly,
         "disease_totals": [
             {
-                "disease": name,
+                "disease": disease,
                 "cases": int(
                     cases or 0
                 ),
             }
-            for name, cases in disease_totals
-        ],
-
-        "taluk_totals": [
-            {
-                "taluk_id": taluk_id,
-                "taluk_name": (
-                    taluk_lookup[taluk_id].name
-                    if taluk_id in taluk_lookup
-                    else "Unknown Taluk"
-                ),
-                "cases": int(
-                    cases or 0
-                ),
-            }
-            for taluk_id, cases in taluk_totals
+            for disease, cases
+            in disease_totals
         ],
     }
 
@@ -522,80 +1367,334 @@ def medical_analytics(
 
 @router.get("/risk-map")
 def medical_risk_map(
-    disease: Optional[str] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    latest_week = (
-        db.query(
-            func.max(
-                models.Prediction.week_number
-            )
-        )
-        .scalar()
-    )
-
-    if latest_week is None:
-        return []
-
-    query = (
-        db.query(models.Prediction)
-        .filter(
-            models.Prediction.week_number
-            == latest_week
-        )
-    )
-
-    if disease:
-        query = query.filter(
-            models.Prediction.disease
-            == disease
-        )
+    current_week = current_week_number()
 
     predictions = (
-        query
-        .order_by(
-            models.Prediction.predicted_cases.desc()
+        db.query(
+            models.Prediction
+        )
+        .filter(
+            models.Prediction.week_number
+            == current_week
         )
         .all()
     )
 
-    taluks = {
-        t.id: t
-        for t in db.query(
-            models.Taluk
-        ).all()
+    taluk_ids = {
+        prediction.taluk_id
+        for prediction in predictions
+        if prediction.taluk_id is not None
     }
+
+    taluks = {}
+
+    if taluk_ids:
+
+        taluks = {
+            taluk.id: taluk
+            for taluk in (
+                db.query(
+                    models.Taluk
+                )
+                .filter(
+                    models.Taluk.id.in_(
+                        taluk_ids
+                    )
+                )
+                .all()
+            )
+        }
+
+    rows = []
+
+    risk_rank = {
+        "Low": 1,
+        "Moderate": 2,
+        "High": 3,
+        "Critical": 4,
+    }
+
+    grouped = {}
+
+    for prediction in predictions:
+
+        key = (
+            prediction.taluk_id,
+            prediction.disease,
+        )
+
+        existing = grouped.get(key)
+
+        if (
+            existing is None
+            or
+            risk_rank.get(
+                prediction.risk_level,
+                0,
+            )
+            >
+            risk_rank.get(
+                existing.risk_level,
+                0,
+            )
+        ):
+
+            grouped[key] = prediction
+
+    for prediction in grouped.values():
+
+        taluk = taluks.get(
+            prediction.taluk_id
+        )
+
+        district = (
+            taluk.district
+            if taluk
+            else None
+        )
+
+        rows.append(
+            {
+                "id": prediction.id,
+                "taluk_id": (
+                    prediction.taluk_id
+                ),
+                "taluk_name": (
+                    taluk.name
+                    if taluk
+                    else "Unknown Taluk"
+                ),
+                "district_id": (
+                    district.id
+                    if district
+                    else None
+                ),
+                "district_name": (
+                    district.name
+                    if district
+                    else "Unknown District"
+                ),
+                "disease": (
+                    prediction.disease
+                ),
+                "risk_level": (
+                    prediction.risk_level
+                    or "Low"
+                ),
+                "current_cases": (
+                    prediction.current_cases
+                    or 0
+                ),
+                "predicted_cases": (
+                    prediction.predicted_cases
+                    or 0
+                ),
+                "trend": (
+                    prediction.trend
+                    or "stable"
+                ),
+                "latitude": (
+                    getattr(
+                        taluk,
+                        "latitude",
+                        None,
+                    )
+                    if taluk
+                    else None
+                ),
+                "longitude": (
+                    getattr(
+                        taluk,
+                        "longitude",
+                        None,
+                    )
+                    if taluk
+                    else None
+                ),
+                "created_at": (
+                    prediction.created_at
+                ),
+            }
+        )
+
+    return rows
+
+
+# ============================================================
+# DISEASE LIST
+# ============================================================
+
+@router.get("/diseases")
+def medical_diseases(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(supervisor_only),
+):
+    diseases = (
+        db.query(
+            models.Disease
+        )
+        .order_by(
+            models.Disease.name.asc()
+        )
+        .all()
+    )
 
     return [
         {
-            "taluk_id": p.taluk_id,
-            "taluk_name": (
-                taluks[p.taluk_id].name
-                if p.taluk_id in taluks
-                else "Unknown Taluk"
+            "id": disease.id,
+            "name": disease.name,
+            "description": getattr(
+                disease,
+                "description",
+                None,
             ),
-            "district_name": (
-                taluks[p.taluk_id].district.name
-                if p.taluk_id in taluks
-                and taluks[p.taluk_id].district
-                else "Unknown District"
+            "is_active": getattr(
+                disease,
+                "is_active",
+                True,
             ),
-            "disease": p.disease,
-            "current_cases": p.current_cases or 0,
-            "predicted_cases": p.predicted_cases or 0,
-            "risk_level": p.risk_level,
-            "trend": p.trend,
-            "confidence": p.confidence,
-            "week_number": p.week_number,
-            "year": p.year,
         }
-        for p in predictions
+        for disease in diseases
     ]
 
 
 # ============================================================
-# EMERGING DISEASE
+# AGENTS
+# ============================================================
+
+@router.get("/agents")
+def medical_agents(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(supervisor_only),
+):
+    agents = (
+        db.query(
+            models.Agent
+        )
+        .join(
+            models.User,
+            models.Agent.user_id
+            == models.User.id,
+        )
+        .order_by(
+            models.User.full_name.asc()
+        )
+        .all()
+    )
+
+    return [
+        {
+            "id": agent.id,
+            "agent_id": agent.id,
+            "user_id": agent.user_id,
+            "name": (
+                agent.user.full_name
+                if agent.user
+                else "Unknown Agent"
+            ),
+            "full_name": (
+                agent.user.full_name
+                if agent.user
+                else "Unknown Agent"
+            ),
+            "username": (
+                agent.user.username
+                if agent.user
+                else None
+            ),
+            "taluk_id": agent.taluk_id,
+            "taluk_name": (
+                agent.taluk.name
+                if agent.taluk
+                else "Unknown Taluk"
+            ),
+            "district_name": (
+                agent.taluk.district.name
+                if (
+                    agent.taluk
+                    and agent.taluk.district
+                )
+                else "Unknown District"
+            ),
+            "is_active": (
+                bool(agent.user.is_active)
+                if agent.user
+                else False
+            ),
+        }
+        for agent in agents
+    ]
+
+
+# ============================================================
+# AGENT ISSUES
+# ============================================================
+
+@router.get("/agent-issues")
+def medical_agent_issues(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(supervisor_only),
+):
+    query = (
+        db.query(
+            models.AgentIssueReport
+        )
+        .order_by(
+            models.AgentIssueReport.created_at.desc()
+        )
+    )
+
+    if status:
+
+        query = query.filter(
+            models.AgentIssueReport.status
+            == status
+        )
+
+    issues = query.all()
+
+    return [
+        {
+            "id": issue.id,
+            "agent_id": issue.agent_id,
+            "agent_name": (
+                issue.agent.user.full_name
+                if (
+                    issue.agent
+                    and issue.agent.user
+                )
+                else "Unknown Agent"
+            ),
+            "taluk_id": issue.taluk_id,
+            "taluk_name": (
+                issue.taluk.name
+                if issue.taluk
+                else "Unknown Taluk"
+            ),
+            "issue_type": (
+                issue.issue_type
+            ),
+            "description": (
+                issue.description
+            ),
+            "status": issue.status,
+            "created_at": (
+                issue.created_at
+            ),
+            "resolved_at": (
+                issue.resolved_at
+            ),
+        }
+        for issue in issues
+    ]
+
+
+# ============================================================
+# EMERGING DISEASES
 # ============================================================
 
 @router.get(
@@ -604,53 +1703,53 @@ def medical_risk_map(
         schemas.EmergingDiseaseOut
     ],
 )
-def pending_emerging(
+def medical_emerging(
+    status: Optional[str] = None,
+    taluk_id: Optional[int] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    reports = (
+    query = (
         db.query(
             models.EmergingDiseaseReport
         )
         .order_by(
             models.EmergingDiseaseReport.created_at.desc()
         )
-        .all()
     )
 
+    if status:
+
+        query = query.filter(
+            models.EmergingDiseaseReport.status
+            == status
+        )
+
+    if taluk_id is not None:
+
+        query = query.filter(
+            models.EmergingDiseaseReport.taluk_id
+            == taluk_id
+        )
+
+    reports = query.all()
+
     return [
-        _serialize_emerging(r)
-        for r in reports
+        _serialize_emerging(
+            report
+        )
+        for report in reports
     ]
 
 
-@router.get(
-    "/diseases",
-    response_model=list[
-        schemas.DiseaseRegistryOut
-    ],
-)
-def disease_registry(
-    db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
-):
-    return (
-        db.query(models.Disease)
-        .filter(
-            models.Disease.is_active.is_(True)
-        )
-        .order_by(
-            models.Disease.name.asc()
-        )
-        .all()
-    )
-
+# ============================================================
+# APPROVE EMERGING DISEASE
+# ============================================================
 
 @router.post(
-    "/emerging/{report_id}/review",
-    response_model=schemas.EmergingDiseaseOut,
+    "/emerging/{report_id}/approve",
 )
-def review_emerging_disease(
+def approve_emerging(
     report_id: int,
     payload: schemas.EmergingDiseaseReview,
     db: Session = Depends(get_db),
@@ -668,335 +1767,104 @@ def review_emerging_disease(
     )
 
     if not report:
+
         raise HTTPException(
             status_code=404,
-            detail="Emerging disease report not found.",
+            detail=(
+                "Emerging disease report "
+                "not found."
+            ),
         )
 
-    if report.status != "PENDING":
+    if report.status == "APPROVED":
+
         raise HTTPException(
             status_code=400,
-            detail="This report has already been reviewed.",
+            detail=(
+                "This report has already "
+                "been approved."
+            ),
         )
 
-    decision = (
-        payload.decision
-        .upper()
-        .strip()
+    report.status = "APPROVED"
+
+    report.review_notes = (
+        payload.review_notes
+        if payload
+        else None
     )
 
-    if decision not in {
-        "VERIFY_EXISTING",
-        "VERIFY_NEW",
-        "REJECT",
-    }:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid review decision.",
-        )
-
-    # --------------------------------------------------------
-    # REJECT
-    # --------------------------------------------------------
-
-    if decision == "REJECT":
-
-        report.status = "REJECTED"
-
-    # --------------------------------------------------------
-    # VERIFY
-    # --------------------------------------------------------
-
-    else:
-
-        if decision == "VERIFY_EXISTING":
-
-            if not payload.mapped_disease_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Select an existing disease.",
-                )
-
-            disease = (
-                db.query(models.Disease)
-                .filter(
-                    models.Disease.id
-                    == payload.mapped_disease_id,
-                    models.Disease.is_active.is_(True),
-                )
-                .first()
-            )
-
-            if not disease:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Disease not found in official registry.",
-                )
-
-        else:
-
-            name = (
-                payload.new_disease_name
-                or ""
-            ).strip()
-
-            if len(name) < 2:
-                raise HTTPException(
-                    status_code=400,
-                    detail="New disease name is required.",
-                )
-
-            disease = (
-                db.query(models.Disease)
-                .filter(
-                    models.Disease.name.ilike(
-                        name
-                    )
-                )
-                .first()
-            )
-
-            if disease:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "A disease with this name "
-                        "already exists. Map the report "
-                        "to the existing disease."
-                    ),
-                )
-
-            disease = models.Disease(
-                name=name,
-                description=(
-                    payload.new_disease_description
-                ),
-                verification_status="VERIFIED",
-                is_active=True,
-                created_by_user_id=user.id,
-                verified_by_user_id=user.id,
-                verified_at=datetime.utcnow(),
-            )
-
-            db.add(disease)
-            db.flush()
-
-        report.mapped_disease_id = disease.id
-        report.status = "VERIFIED"
-
-        current = datetime.utcnow()
-
-        existing = (
-            db.query(models.DiseaseReport)
-            .filter(
-                models.DiseaseReport.agent_id
-                == report.agent_id,
-                models.DiseaseReport.taluk_id
-                == report.taluk_id,
-                models.DiseaseReport.disease
-                == disease.name,
-                models.DiseaseReport.week_number
-                == current.isocalendar().week,
-                models.DiseaseReport.year
-                == current.year,
-            )
-            .first()
-        )
-
-        if existing:
-
-            existing.cases = (
-                (existing.cases or 0)
-                + (report.suspected_cases or 0)
-            )
-
-            existing.updated_at = current
-
-        else:
-
-            db.add(
-                models.DiseaseReport(
-                    agent_id=report.agent_id,
-                    taluk_id=report.taluk_id,
-                    disease=disease.name,
-                    cases=(
-                        report.suspected_cases
-                        or 0
-                    ),
-                    severity="Moderate",
-                    remarks=(
-                        "Verified through Medical "
-                        "Supervisor emerging-disease review."
-                    ),
-                    preventive_measures=(
-                        "Follow official local health guidance."
-                    ),
-                    week_number=current.isocalendar().week,
-                    year=current.year,
-                )
-            )
-
-    report.reviewed_by_user_id = user.id
-    report.review_notes = payload.review_notes
-    report.reviewed_at = datetime.utcnow()
+    report.reviewed_at = (
+        datetime.utcnow()
+    )
 
     db.commit()
+
     db.refresh(report)
 
-    return _serialize_emerging(report)
-
-
-# ============================================================
-# AGENTS
-# ============================================================
-
-@router.get(
-    "/agents",
-    response_model=list[schemas.AgentOut],
-)
-def list_agents_for_supervisor(
-    db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
-):
-    agents = (
-        db.query(models.Agent)
-        .join(
-            models.User,
-            models.Agent.user_id
-            == models.User.id,
-        )
-        .order_by(
-            models.User.full_name.asc()
-        )
-        .all()
+    return _serialize_emerging(
+        report
     )
 
-    return [
-        schemas.AgentOut(
-            id=a.id,
-            username=a.user.username,
-            full_name=a.user.full_name,
-            taluk_id=a.taluk_id,
-            taluk_name=(
-                a.taluk.name
-                if a.taluk
-                else None
-            ),
-            is_active=bool(
-                a.user.is_active
-            ),
-        )
-        for a in agents
-    ]
-
 
 # ============================================================
-# AGENT ISSUES
+# REJECT EMERGING DISEASE
 # ============================================================
-
-@router.get("/agent-issues")
-def supervisor_agent_issues(
-    db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
-):
-    issues = (
-        db.query(
-            models.AgentIssueReport
-        )
-        .filter(
-            models.AgentIssueReport.supervisor_id
-            == user.id
-        )
-        .order_by(
-            models.AgentIssueReport.created_at.desc()
-        )
-        .all()
-    )
-
-    return [
-        {
-            "id": i.id,
-            "agent_id": i.agent_id,
-            "agent_name": (
-                i.agent.user.full_name
-                if i.agent
-                and i.agent.user
-                else "Unknown Agent"
-            ),
-            "issue_type": i.issue_type,
-            "severity": i.severity,
-            "description": i.description,
-            "evidence": i.evidence,
-            "status": i.status,
-            "admin_notes": i.admin_notes,
-            "created_at": i.created_at,
-            "reviewed_at": i.reviewed_at,
-        }
-        for i in issues
-    ]
-
 
 @router.post(
-    "/agent-issues",
-    response_model=schemas.AgentIssueOut,
+    "/emerging/{report_id}/reject",
 )
-def report_agent_issue(
-    payload: schemas.AgentIssueCreate,
+def reject_emerging(
+    report_id: int,
+    payload: schemas.EmergingDiseaseReview,
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    agent = (
-        db.query(models.Agent)
+    report = (
+        db.query(
+            models.EmergingDiseaseReport
+        )
         .filter(
-            models.Agent.id
-            == payload.agent_id
+            models.EmergingDiseaseReport.id
+            == report_id
         )
         .first()
     )
 
-    if not agent:
+    if not report:
+
         raise HTTPException(
             status_code=404,
-            detail="Agent not found.",
+            detail=(
+                "Emerging disease report "
+                "not found."
+            ),
         )
 
-    issue = models.AgentIssueReport(
-        agent_id=payload.agent_id,
-        supervisor_id=user.id,
-        issue_type=payload.issue_type,
-        severity=payload.severity,
-        description=payload.description,
-        evidence=payload.evidence,
+    report.status = "REJECTED"
+
+    report.review_notes = (
+        payload.review_notes
+        if payload
+        else None
     )
 
-    db.add(issue)
+    report.reviewed_at = (
+        datetime.utcnow()
+    )
+
     db.commit()
-    db.refresh(issue)
 
-    return schemas.AgentIssueOut(
-        id=issue.id,
-        agent_id=issue.agent_id,
-        agent_name=(
-            agent.user.full_name
-            if agent.user
-            else "Unknown Agent"
-        ),
-        supervisor_id=issue.supervisor_id,
-        issue_type=issue.issue_type,
-        severity=issue.severity,
-        description=issue.description,
-        evidence=issue.evidence,
-        status=issue.status,
-        admin_notes=issue.admin_notes,
-        created_at=issue.created_at,
-        reviewed_at=issue.reviewed_at,
+    db.refresh(report)
+
+    return _serialize_emerging(
+        report
     )
 
 
 # ============================================================
-# HOME RELIEF & SUPPORTIVE CARE
+# HOME RELIEF HELPERS
 # ============================================================
-
 
 def _get_home_relief_rules(
     db: Session,
@@ -1029,220 +1897,104 @@ def _serialize_home_relief(
     return schemas.HomeReliefOut(
         id=remedy.id,
         name=remedy.name,
-        disease=remedy.disease,
-        symptom=remedy.symptom,
-        aliases=remedy.aliases,
-        category=remedy.category,
-
         description=remedy.description,
+        category=remedy.category,
         instructions=remedy.instructions,
-
-        expected_benefit=remedy.expected_benefit,
-        medical_rationale=remedy.medical_rationale,
-
-        possible_side_effects=(
-            remedy.possible_side_effects
-        ),
-        general_safety_notes=(
-            remedy.general_safety_notes
-        ),
-
-        red_flags=remedy.red_flags,
-        when_to_seek_care=(
-            remedy.when_to_seek_care
-        ),
-
+        precautions=remedy.precautions,
         status=remedy.status,
-
         created_by=remedy.created_by,
         approved_by=remedy.approved_by,
-
-        created_at=remedy.created_at,
         approved_at=remedy.approved_at,
         last_reviewed_at=(
             remedy.last_reviewed_at
         ),
+        created_at=remedy.created_at,
         updated_at=remedy.updated_at,
-
         safety_rules=[
-            schemas.HomeReliefSafetyRuleOut
-            .model_validate(rule)
+            schemas.HomeReliefSafetyRuleOut(
+                id=rule.id,
+                remedy_id=rule.remedy_id,
+                condition_type=(
+                    rule.condition_type
+                ),
+                condition_value=(
+                    rule.condition_value
+                ),
+                suitability=(
+                    rule.suitability
+                ),
+                severity=rule.severity,
+                reason=rule.reason,
+                alternative_remedy_id=(
+                    rule.alternative_remedy_id
+                ),
+                created_by=rule.created_by,
+            )
             for rule in rules
         ],
     )
 
 
-# ============================================================
-# HOME RELIEF VALIDATION
-# ============================================================
-
 def _validate_home_relief_for_approval(
     remedy,
     rules,
 ):
-    """
-    A remedy can only become ACTIVE when the
-    Medical Supervisor has supplied complete
-    safety information.
-    """
+    if not remedy.name or not remedy.name.strip():
 
-    required_fields = {
-        "description": remedy.description,
-        "instructions": remedy.instructions,
-        "general_safety_notes": (
-            remedy.general_safety_notes
-        ),
-        "when_to_seek_care": (
-            remedy.when_to_seek_care
-        ),
-        "possible_side_effects": (
-            remedy.possible_side_effects
-        ),
-    }
-
-    missing = [
-        field_name
-        for field_name, value
-        in required_fields.items()
-        if not value
-        or not str(value).strip()
-    ]
-
-    if missing:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Complete medical safety information "
-                "before approval: "
-                + ", ".join(missing)
+                "Remedy name is required "
+                "before approval."
             ),
         )
 
-    # --------------------------------------------------------
-    # Validate every safety rule
-    # --------------------------------------------------------
+    if not remedy.description or not remedy.description.strip():
 
-    for index, rule in enumerate(rules, start=1):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Remedy description is required "
+                "before approval."
+            ),
+        )
 
-        condition_type = (
-            rule.condition_type
-            or ""
-        ).strip()
+    for rule in rules:
 
-        condition_value = (
-            rule.condition_value
-            or ""
-        ).strip()
+        if not rule.condition_type:
 
-        suitability = (
-            rule.suitability
-            or ""
-        ).upper().strip()
-
-        severity = (
-            rule.severity
-            or ""
-        ).strip()
-
-        reason = (
-            rule.reason
-            or ""
-        ).strip()
-
-        if not condition_type:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Safety restriction #{index} "
-                    "must specify a safety context."
+                    "Every safety restriction "
+                    "must have a condition type."
                 ),
             )
 
-        if not condition_value:
+        if not rule.condition_value:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Safety restriction #{index} "
-                    "must specify who or what the "
-                    "restriction applies to."
+                    "Every safety restriction "
+                    "must have a condition value."
                 ),
             )
 
-        if suitability not in {
-            "SUITABLE",
-            "CAUTION",
-            "NOT_RECOMMENDED",
-            "CONTRAINDICATED",
-        }:
+        if not rule.reason:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Safety restriction #{index} "
-                    "must have a valid suitability status."
+                    "Every safety restriction "
+                    "must include a medical "
+                    "safety reason."
                 ),
             )
-
-        if not severity:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Safety restriction #{index} "
-                    "must specify severity."
-                ),
-            )
-
-        if not reason:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Safety restriction #{index} "
-                    "must include a medical safety reason."
-                ),
-            )
-
-        # ----------------------------------------------------
-        # Alternative validation
-        # ----------------------------------------------------
-
-        if rule.alternative_remedy_id:
-
-            if (
-                rule.alternative_remedy_id
-                == remedy.id
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Safety restriction #{index} "
-                        "cannot reference itself as an alternative."
-                    ),
-                )
-
-            alternative = (
-                db.query(
-                    models.HomeReliefRemedy
-                )
-                .filter(
-                    models.HomeReliefRemedy.id
-                    == rule.alternative_remedy_id,
-                    models.HomeReliefRemedy.status
-                    == "ACTIVE",
-                )
-                .first()
-            )
-
-            if not alternative:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Safety restriction #{index} "
-                        "references an unavailable alternative remedy."
-                    ),
-                )
 
 
 # ============================================================
-# LIST ALL HOME RELIEFS
+# HOME RELIEF LIST
 # ============================================================
 
 @router.get(
@@ -1251,56 +2003,28 @@ def _validate_home_relief_for_approval(
         schemas.HomeReliefOut
     ],
 )
-def list_home_reliefs(
+def list_home_relief(
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    remedies = (
+    query = (
         db.query(
             models.HomeReliefRemedy
-        )
-        .order_by(
-            models.HomeReliefRemedy.updated_at.desc()
-        )
-        .all()
-    )
-
-    return [
-        _serialize_home_relief(
-            db,
-            remedy,
-        )
-        for remedy in remedies
-    ]
-
-
-# ============================================================
-# LIST PENDING HOME RELIEFS
-# ============================================================
-
-@router.get(
-    "/home-relief/pending",
-    response_model=list[
-        schemas.HomeReliefOut
-    ],
-)
-def pending_home_reliefs(
-    db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
-):
-    remedies = (
-        db.query(
-            models.HomeReliefRemedy
-        )
-        .filter(
-            models.HomeReliefRemedy.status
-            == "PENDING"
         )
         .order_by(
             models.HomeReliefRemedy.created_at.desc()
         )
-        .all()
     )
+
+    if status:
+
+        query = query.filter(
+            models.HomeReliefRemedy.status
+            == status
+        )
+
+    remedies = query.all()
 
     return [
         _serialize_home_relief(
@@ -1324,86 +2048,43 @@ def create_home_relief(
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    name = (
-        payload.name
-        or ""
-    ).strip()
-
-    if not name:
-        raise HTTPException(
-            status_code=400,
-            detail="Remedy name is required.",
-        )
-
-    description = (
-        payload.description
-        or ""
-    ).strip()
-
-    instructions = (
-        payload.instructions
-        or ""
-    ).strip()
-
-    if not description:
-        raise HTTPException(
-            status_code=400,
-            detail="Description is required.",
-        )
-
-    if not instructions:
-        raise HTTPException(
-            status_code=400,
-            detail="Instructions are required.",
-        )
-
-    # --------------------------------------------------------
-    # Create remedy
-    # --------------------------------------------------------
+    now = datetime.utcnow()
 
     remedy = models.HomeReliefRemedy(
-        name=name,
-
-        disease=payload.disease,
-        symptom=payload.symptom,
-        aliases=payload.aliases,
-        category=payload.category,
-
-        description=description,
-        instructions=instructions,
-
-        expected_benefit=(
-            payload.expected_benefit
-        ),
-        medical_rationale=(
-            payload.medical_rationale
-        ),
-
-        possible_side_effects=(
-            payload.possible_side_effects
-        ),
-        general_safety_notes=(
-            payload.general_safety_notes
-        ),
-
-        red_flags=payload.red_flags,
-        when_to_seek_care=(
-            payload.when_to_seek_care
-        ),
-
+        name=(
+            payload.name or ""
+        ).strip(),
+        description=(
+            payload.description or ""
+        ).strip(),
+        category=(
+            payload.category
+            or "Supportive Care"
+        ).strip(),
+        instructions=(
+            payload.instructions
+            or ""
+        ).strip(),
+        precautions=(
+            payload.precautions
+            or ""
+        ).strip(),
         status="PENDING",
-
         created_by=user.id,
+        created_at=now,
+        updated_at=now,
     )
 
     db.add(remedy)
+
     db.flush()
 
-    # --------------------------------------------------------
-    # Create safety rules
-    # --------------------------------------------------------
+    safety_rules = (
+        payload.safety_rules
+        or []
+    )
 
-    for item in payload.safety_rules:
+    for item in safety_rules:
 
         condition_type = (
             item.condition_type
@@ -1431,6 +2112,7 @@ def create_home_relief(
         ).strip()
 
         if not condition_type:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -1440,20 +2122,13 @@ def create_home_relief(
             )
 
         if not condition_value:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Every safety restriction "
-                    "must specify the affected context."
-                ),
-            )
 
-        if not reason:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Every safety restriction "
-                    "must include a safety reason."
+                    "must specify the affected "
+                    "context."
                 ),
             )
 
@@ -1463,6 +2138,7 @@ def create_home_relief(
             "NOT_RECOMMENDED",
             "CONTRAINDICATED",
         }:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -1471,40 +2147,50 @@ def create_home_relief(
                 ),
             )
 
+        if not reason:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Every safety restriction "
+                    "must include a medical "
+                    "safety reason."
+                ),
+            )
+
         db.add(
             models.HomeReliefSafetyRule(
                 remedy_id=remedy.id,
-
-                condition_type=condition_type,
-                condition_value=condition_value,
-
-                suitability=suitability,
+                condition_type=(
+                    condition_type
+                ),
+                condition_value=(
+                    condition_value
+                ),
+                suitability=(
+                    suitability
+                ),
                 severity=severity,
-
                 reason=reason,
-
                 alternative_remedy_id=(
                     item.alternative_remedy_id
                 ),
-
                 created_by=user.id,
             )
         )
-
-    # --------------------------------------------------------
-    # Audit
-    # --------------------------------------------------------
 
     db.add(
         models.HomeReliefAuditLog(
             remedy_id=remedy.id,
             action="CREATED",
             performed_by=user.id,
+            old_value=None,
             new_value=payload.model_dump_json(),
         )
     )
 
     db.commit()
+
     db.refresh(remedy)
 
     return _serialize_home_relief(
@@ -1538,20 +2224,26 @@ def approve_home_relief(
     )
 
     if not remedy:
+
         raise HTTPException(
             status_code=404,
-            detail="Home relief remedy not found.",
+            detail=(
+                "Home relief remedy "
+                "not found."
+            ),
         )
 
     if remedy.status not in {
         "PENDING",
         "REJECTED",
     }:
+
         raise HTTPException(
             status_code=400,
             detail=(
-                "Only pending or previously rejected "
-                "remedies can be approved."
+                "Only pending or previously "
+                "rejected remedies can be "
+                "approved."
             ),
         )
 
@@ -1567,12 +2259,18 @@ def approve_home_relief(
 
     now = datetime.utcnow()
 
-    previous_status = remedy.status
+    previous_status = (
+        remedy.status
+    )
 
     remedy.status = "ACTIVE"
+
     remedy.approved_by = user.id
+
     remedy.approved_at = now
+
     remedy.last_reviewed_at = now
+
     remedy.updated_at = now
 
     db.add(
@@ -1586,6 +2284,7 @@ def approve_home_relief(
     )
 
     db.commit()
+
     db.refresh(remedy)
 
     return _serialize_home_relief(
@@ -1620,17 +2319,23 @@ def reject_home_relief(
     )
 
     if not remedy:
+
         raise HTTPException(
             status_code=404,
-            detail="Home relief remedy not found.",
+            detail=(
+                "Home relief remedy "
+                "not found."
+            ),
         )
 
     if remedy.status == "ACTIVE":
+
         raise HTTPException(
             status_code=400,
             detail=(
-                "Active remedies must be deactivated "
-                "instead of rejected."
+                "Active remedies must be "
+                "deactivated instead of "
+                "rejected."
             ),
         )
 
@@ -1640,16 +2345,25 @@ def reject_home_relief(
     ).strip()
 
     if not reason:
+
         raise HTTPException(
             status_code=400,
-            detail="A rejection reason is required.",
+            detail=(
+                "A rejection reason "
+                "is required."
+            ),
         )
 
-    previous_status = remedy.status
+    previous_status = (
+        remedy.status
+    )
+
     now = datetime.utcnow()
 
     remedy.status = "REJECTED"
+
     remedy.last_reviewed_at = now
+
     remedy.updated_at = now
 
     db.add(
@@ -1663,6 +2377,7 @@ def reject_home_relief(
     )
 
     db.commit()
+
     db.refresh(remedy)
 
     return _serialize_home_relief(
@@ -1696,24 +2411,35 @@ def deactivate_home_relief(
     )
 
     if not remedy:
+
         raise HTTPException(
             status_code=404,
-            detail="Home relief remedy not found.",
-        )
-
-    if remedy.status != "ACTIVE":
-        raise HTTPException(
-            status_code=400,
             detail=(
-                "Only active remedies can be deactivated."
+                "Home relief remedy "
+                "not found."
             ),
         )
 
-    previous_status = remedy.status
+    if remedy.status != "ACTIVE":
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Only active remedies "
+                "can be deactivated."
+            ),
+        )
+
+    previous_status = (
+        remedy.status
+    )
+
     now = datetime.utcnow()
 
     remedy.status = "INACTIVE"
+
     remedy.last_reviewed_at = now
+
     remedy.updated_at = now
 
     db.add(
@@ -1727,6 +2453,7 @@ def deactivate_home_relief(
     )
 
     db.commit()
+
     db.refresh(remedy)
 
     return _serialize_home_relief(
@@ -1761,13 +2488,17 @@ def update_home_relief(
     )
 
     if not remedy:
+
         raise HTTPException(
             status_code=404,
-            detail="Home relief remedy not found.",
+            detail=(
+                "Home relief remedy "
+                "not found."
+            ),
         )
 
     # --------------------------------------------------------
-    # Capture old state for audit
+    # Capture old state
     # --------------------------------------------------------
 
     before = (
@@ -1795,6 +2526,7 @@ def update_home_relief(
             continue
 
         if isinstance(value, str):
+
             value = value.strip()
 
         setattr(
@@ -1850,6 +2582,7 @@ def update_home_relief(
             ).strip()
 
             if not condition_type:
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -1859,11 +2592,13 @@ def update_home_relief(
                 )
 
             if not condition_value:
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
                         "Every safety restriction "
-                        "must specify the affected context."
+                        "must specify the affected "
+                        "context."
                     ),
                 )
 
@@ -1873,6 +2608,7 @@ def update_home_relief(
                 "NOT_RECOMMENDED",
                 "CONTRAINDICATED",
             }:
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -1882,30 +2618,33 @@ def update_home_relief(
                 )
 
             if not reason:
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
                         "Every safety restriction "
-                        "must include a medical safety reason."
+                        "must include a medical "
+                        "safety reason."
                     ),
                 )
 
             db.add(
                 models.HomeReliefSafetyRule(
                     remedy_id=remedy.id,
-
-                    condition_type=condition_type,
-                    condition_value=condition_value,
-
-                    suitability=suitability,
+                    condition_type=(
+                        condition_type
+                    ),
+                    condition_value=(
+                        condition_value
+                    ),
+                    suitability=(
+                        suitability
+                    ),
                     severity=severity,
-
                     reason=reason,
-
                     alternative_remedy_id=(
                         item.alternative_remedy_id
                     ),
-
                     created_by=user.id,
                 )
             )
@@ -1917,15 +2656,22 @@ def update_home_relief(
         if remedy.status == "ACTIVE":
 
             remedy.status = "PENDING"
+
             remedy.approved_by = None
+
             remedy.approved_at = None
 
     # --------------------------------------------------------
     # Any substantive edit requires another review.
     # --------------------------------------------------------
 
-    remedy.last_reviewed_at = datetime.utcnow()
-    remedy.updated_at = datetime.utcnow()
+    remedy.last_reviewed_at = (
+        datetime.utcnow()
+    )
+
+    remedy.updated_at = (
+        datetime.utcnow()
+    )
 
     db.add(
         models.HomeReliefAuditLog(
@@ -1938,6 +2684,7 @@ def update_home_relief(
     )
 
     db.commit()
+
     db.refresh(remedy)
 
     return _serialize_home_relief(

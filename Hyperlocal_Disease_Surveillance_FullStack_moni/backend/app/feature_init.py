@@ -5,7 +5,11 @@ from .auth import get_password_hash
 
 
 def initialize_feature():
-    """Create the official registry and demo Medical Supervisor if missing."""
+    """Ensure the official disease registry and Medical Supervisor account exist.
+
+    This is intentionally additive: it does not reseed or replace surveillance
+    reports, agents, predictions, or other existing project data.
+    """
     db = SessionLocal()
     try:
         for name in models.DISEASES:
