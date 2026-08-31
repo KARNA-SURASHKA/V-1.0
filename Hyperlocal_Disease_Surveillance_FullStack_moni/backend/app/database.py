@@ -96,3 +96,14 @@ def ensure_schema_compatibility():
                     "ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
                 )
             )
+
+    # District scoping for Medical Supervisor accounts.
+    if "supervisor_district_id" not in columns:
+
+        with engine.begin() as connection:
+
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN supervisor_district_id INTEGER"
+                )
+            )

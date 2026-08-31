@@ -2,8 +2,12 @@
 // API CONFIGURATION
 // ============================================================
 
-// Keep this identical to the address shown by Uvicorn.
-const API_BASE = "http://127.0.0.1:8000";
+// Backend URL. VITE_API_BASE can override it; otherwise use the same
+// loopback hostname that opened the frontend so localhost/127.0.0.1
+// do not accidentally get mixed during development.
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  `http://${window.location.hostname || "127.0.0.1"}:8000`;
 
 // ============================================================
 // SESSION / AUTH HELPERS
@@ -674,36 +678,28 @@ const api = {
 
   submitAgentIssue:
     async (payload) => {
-      return request(
-        "/medical/agent-issues",
-        {
-          method: "POST",
-          body: {
-            agent_id:
-              Number(payload?.agent_id),
+      const formData = new FormData();
+      formData.append("agent_id", String(Number(payload?.agent_id)));
+      formData.append("issue_type", String(payload?.issue_type || "").trim());
+      formData.append("severity", String(payload?.severity || "Medium").trim());
+      formData.append("description", String(payload?.description || "").trim());
+      formData.append("evidence", String(payload?.evidence || "").trim());
+      (payload?.files || []).forEach((file) => formData.append("proof", file));
 
-            issue_type:
-              String(
-                payload?.issue_type || ""
-              ).trim(),
+      const token = getToken();
+      const response = await fetch(`${API_BASE}/medical/agent-issues`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(getErrorMessage(data?.detail || data?.message));
+      return data;
+    },
 
-            severity:
-              String(
-                payload?.severity || "Low"
-              ).trim(),
-
-            description:
-              String(
-                payload?.description || ""
-              ).trim(),
-
-            evidence:
-              String(
-                payload?.evidence || ""
-              ).trim(),
-          },
-        }
-      );
+  remindSupervisorAgent:
+    async (agentId) => {
+      return request(`/medical/agents/${agentId}/remind`, { method: "POST" });
     },
 
   // ==========================================================

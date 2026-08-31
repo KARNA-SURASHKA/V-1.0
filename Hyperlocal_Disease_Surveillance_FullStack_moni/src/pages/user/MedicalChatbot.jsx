@@ -21,6 +21,8 @@ import remarkGfm from "remark-gfm";
 
 import { api } from "../../api";
 
+import { useAuth } from "../../context/AuthContext";
+
 import heroRight
   from "../../assets/ui/medical-hero-right.png";
 
@@ -184,6 +186,15 @@ function MedicalMarkdown({
 export default function MedicalChatbot({
   selectedLocation,
 }) {
+
+  const { session } = useAuth();
+
+  const username =
+    session?.username ||
+    session?.user?.username ||
+    session?.user?.name ||
+    session?.name ||
+    "User";
 
   const [
     messages,
@@ -495,7 +506,7 @@ export default function MedicalChatbot({
               text-[#101A31]
             "
           >
-            Hello Monish! 👋
+            Hello {username}! 👋
           </h1>
 
 

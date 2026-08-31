@@ -12,6 +12,7 @@ from .routers.agent import router as agent_router
 from .routers.admin import router as admin_router
 from .routers.medical_chat import router as medical_chat_router
 from .routers.medical import router as medical_router
+from .routers.medical_supervisor import router as medical_supervisor_router
 from .routers.home_relief import router as home_relief_router
 
 
@@ -51,6 +52,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
+    # Also permit another local Vite port (5174, 5175, etc.) during development.
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
 
     allow_credentials=True,
 
@@ -86,7 +89,14 @@ app.include_router(
     admin_router
 )
 
-# Medical Supervisor
+# District-scoped Medical Supervisor API.
+# This router is registered before the legacy medical router so that
+# supervisor requests can never escape the assigned district.
+app.include_router(
+    medical_supervisor_router
+)
+
+# Legacy Medical Supervisor / Home Relief endpoints.
 app.include_router(
     medical_router
 )
@@ -100,6 +110,15 @@ app.include_router(
 app.include_router(
     home_relief_router
 )
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+def health():
+    return {"ok": True, "service": "Hyperlocal Disease Surveillance API"}
 
 
 # ============================================================

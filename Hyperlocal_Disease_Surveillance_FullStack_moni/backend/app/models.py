@@ -70,6 +70,14 @@ class User(Base):
         default=True,
     )
 
+    # District assigned to a Medical Supervisor.
+    supervisor_district_id = Column(
+        Integer,
+        ForeignKey("districts.id"),
+        nullable=True,
+        index=True,
+    )
+
     # --------------------------------------------------------
     # Relationships
     # --------------------------------------------------------

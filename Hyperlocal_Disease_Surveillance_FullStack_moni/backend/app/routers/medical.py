@@ -1639,13 +1639,20 @@ def medical_agent_issues(
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
+    district_id = getattr(user, "supervisor_district_id", None)
+    district = (
+        db.query(models.District).filter(models.District.id == district_id).first()
+        if district_id else None
+    )
+    if district is None:
+        district = db.query(models.District).filter(models.District.name.ilike("Kodagu")).first()
+    taluk_ids = [t.id for t in district.taluks] if district else []
+
     query = (
-        db.query(
-            models.AgentIssueReport
-        )
-        .order_by(
-            models.AgentIssueReport.created_at.desc()
-        )
+        db.query(models.AgentIssueReport)
+        .join(models.Agent, models.AgentIssueReport.agent_id == models.Agent.id)
+        .filter(models.Agent.taluk_id.in_(taluk_ids or [-1]))
+        .order_by(models.AgentIssueReport.created_at.desc())
     )
 
     if status:
@@ -1669,10 +1676,10 @@ def medical_agent_issues(
                 )
                 else "Unknown Agent"
             ),
-            "taluk_id": issue.taluk_id,
+            "taluk_id": issue.agent.taluk_id if issue.agent else None,
             "taluk_name": (
-                issue.taluk.name
-                if issue.taluk
+                issue.agent.taluk.name
+                if issue.agent and issue.agent.taluk
                 else "Unknown Taluk"
             ),
             "issue_type": (
@@ -1686,7 +1693,7 @@ def medical_agent_issues(
                 issue.created_at
             ),
             "resolved_at": (
-                issue.resolved_at
+                issue.reviewed_at
             ),
         }
         for issue in issues
@@ -1900,7 +1907,15 @@ def _serialize_home_relief(
         description=remedy.description,
         category=remedy.category,
         instructions=remedy.instructions,
-        precautions=remedy.precautions,
+        disease=remedy.disease,
+        symptom=remedy.symptom,
+        aliases=remedy.aliases,
+        expected_benefit=remedy.expected_benefit,
+        medical_rationale=remedy.medical_rationale,
+        possible_side_effects=remedy.possible_side_effects,
+        general_safety_notes=remedy.general_safety_notes,
+        red_flags=remedy.red_flags,
+        when_to_seek_care=remedy.when_to_seek_care,
         status=remedy.status,
         created_by=remedy.created_by,
         approved_by=remedy.approved_by,
@@ -2051,30 +2066,24 @@ def create_home_relief(
     now = datetime.utcnow()
 
     remedy = models.HomeReliefRemedy(
-        name=(
-            payload.name or ""
-        ).strip(),
-        description=(
-            payload.description or ""
-        ).strip(),
-        category=(
-            payload.category
-            or "Supportive Care"
-        ).strip(),
-        instructions=(
-            payload.instructions
-            or ""
-        ).strip(),
-        precautions=(
-            payload.precautions
-            or ""
-        ).strip(),
+        name=(payload.name or "").strip(),
+        disease=(payload.disease or "").strip() or None,
+        symptom=(payload.symptom or "").strip() or None,
+        aliases=(payload.aliases or "").strip() or None,
+        category=(payload.category or "supportive_care").strip(),
+        description=(payload.description or "").strip(),
+        instructions=(payload.instructions or "").strip(),
+        expected_benefit=(payload.expected_benefit or "").strip() or None,
+        medical_rationale=(payload.medical_rationale or "").strip() or None,
+        possible_side_effects=(payload.possible_side_effects or "").strip() or None,
+        general_safety_notes=(payload.general_safety_notes or "").strip() or None,
+        red_flags=(payload.red_flags or "").strip() or None,
+        when_to_seek_care=(payload.when_to_seek_care or "").strip() or None,
         status="PENDING",
         created_by=user.id,
         created_at=now,
         updated_at=now,
     )
-
     db.add(remedy)
 
     db.flush()
