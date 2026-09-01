@@ -2,12 +2,16 @@
 // API CONFIGURATION
 // ============================================================
 
-// Backend URL. VITE_API_BASE can override it; otherwise use the same
-// loopback hostname that opened the frontend so localhost/127.0.0.1
-// do not accidentally get mixed during development.
+// Keep the frontend and backend on the same loopback hostname.
+// Backend:
+//   uvicorn app.main:app --reload
+// Usually available at:
+//   http://127.0.0.1:8000
+//
+// You can override this with VITE_API_BASE in .env if needed.
+
 const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  `http://${window.location.hostname || "127.0.0.1"}:8000`;
+  import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
 // ============================================================
 // SESSION / AUTH HELPERS
@@ -28,10 +32,7 @@ const getSession = () => {
 };
 
 const setSession = (session) => {
-  if (
-    session === null ||
-    session === undefined
-  ) {
+  if (session === null || session === undefined) {
     sessionStorage.removeItem("kt_session");
     sessionStorage.removeItem("kt_token");
     return;
@@ -68,7 +69,7 @@ const logout = () => {
 };
 
 // ============================================================
-// ERROR NORMALIZATION
+// ERROR HANDLING
 // ============================================================
 
 const getErrorMessage = (detail) => {
@@ -83,7 +84,9 @@ const getErrorMessage = (detail) => {
   if (Array.isArray(detail)) {
     return detail
       .map((item) => {
-        if (!item) return "";
+        if (!item) {
+          return "";
+        }
 
         if (typeof item === "string") {
           return item;
@@ -127,37 +130,26 @@ const getErrorMessage = (detail) => {
 };
 
 // ============================================================
-// BUILD URL
+// URL BUILDER
 // ============================================================
 
-const buildUrl = (
-  endpoint,
-  params
-) => {
-  let url =
-    `${API_BASE}${endpoint}`;
+const buildUrl = (endpoint, params) => {
+  let url = `${API_BASE}${endpoint}`;
 
   if (params) {
-    const searchParams =
-      new URLSearchParams();
+    const searchParams = new URLSearchParams();
 
-    Object.entries(params).forEach(
-      ([key, value]) => {
-        if (
-          value !== undefined &&
-          value !== null &&
-          value !== ""
-        ) {
-          searchParams.append(
-            key,
-            String(value)
-          );
-        }
+    Object.entries(params).forEach(([key, value]) => {
+      if (
+        value !== undefined &&
+        value !== null &&
+        value !== ""
+      ) {
+        searchParams.append(key, String(value));
       }
-    );
+    });
 
-    const queryString =
-      searchParams.toString();
+    const queryString = searchParams.toString();
 
     if (queryString) {
       url += `?${queryString}`;
@@ -177,27 +169,33 @@ const request = async (
 ) => {
   const {
     method = "GET",
-    body,
-    params,
+    body = undefined,
+    params = undefined,
     auth = true,
   } = options;
 
-  const url = buildUrl(
-    endpoint,
-    params
-  );
+  const url = buildUrl(endpoint, params);
 
   const headers = {
     Accept: "application/json",
   };
 
-  if (
-    body !== undefined &&
-    body !== null
-  ) {
-    headers[
-      "Content-Type"
-    ] = "application/json";
+  // ----------------------------------------------------------
+  // BODY HANDLING
+  // ----------------------------------------------------------
+
+  let requestBody = undefined;
+
+  if (body !== undefined && body !== null) {
+    // IMPORTANT:
+    // FormData must NOT be JSON.stringify()-ed and must NOT
+    // receive an application/json Content-Type.
+    if (body instanceof FormData) {
+      requestBody = body;
+    } else {
+      headers["Content-Type"] = "application/json";
+      requestBody = JSON.stringify(body);
+    }
   }
 
   // ----------------------------------------------------------
@@ -208,19 +206,15 @@ const request = async (
     const token = getToken();
 
     if (token) {
-      headers.Authorization =
-        `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
     }
   }
 
   console.log(
-    `%c[API REQUEST] ${method} ${url}`,
-    "color:#087f5b;font-weight:bold",
+    `[API REQUEST] ${method} ${url}`,
     {
-      authenticated:
-        auth && Boolean(getToken()),
-      hasToken:
-        Boolean(getToken()),
+      authenticated: auth && Boolean(getToken()),
+      hasToken: Boolean(getToken()),
     }
   );
 
@@ -231,18 +225,11 @@ const request = async (
   let response;
 
   try {
-    response = await fetch(
-      url,
-      {
-        method,
-        headers,
-        body:
-          body !== undefined &&
-          body !== null
-            ? JSON.stringify(body)
-            : undefined,
-      }
-    );
+    response = await fetch(url, {
+      method,
+      headers,
+      body: requestBody,
+    });
   } catch (error) {
     console.error(
       `[API NETWORK ERROR] ${method} ${url}`,
@@ -250,9 +237,8 @@ const request = async (
     );
 
     throw new Error(
-      `Network error while calling ${method} ${endpoint}. ` +
-      `The browser could not complete the request to ${API_BASE}. ` +
-      `Check the browser Console and backend terminal.`
+      `Cannot connect to backend at ${API_BASE}. ` +
+      `Make sure FastAPI/Uvicorn is running.`
     );
   }
 
@@ -260,8 +246,7 @@ const request = async (
   // RESPONSE
   // ----------------------------------------------------------
 
-  const text =
-    await response.text();
+  const text = await response.text();
 
   let data = null;
 
@@ -274,22 +259,18 @@ const request = async (
   }
 
   console.log(
-    `%c[API RESPONSE] ${response.status} ${method} ${url}`,
-    response.ok
-      ? "color:#087f5b;font-weight:bold"
-      : "color:#c92a2a;font-weight:bold",
+    `[API RESPONSE] ${response.status} ${method} ${url}`,
     data
   );
 
   // ----------------------------------------------------------
-  // HTTP ERROR
+  // HTTP ERRORS
   // ----------------------------------------------------------
 
   if (!response.ok) {
-    let message =
-      getErrorMessage(
-        data?.detail ?? data
-      );
+    let message = getErrorMessage(
+      data?.detail ?? data
+    );
 
     if (
       !message ||
@@ -300,60 +281,37 @@ const request = async (
         "Request failed.";
     }
 
-    // --------------------------------------------------------
-    // Authentication failure
-    // --------------------------------------------------------
-
+    // Authentication error
     if (
       response.status === 401 &&
       auth
     ) {
-      console.warn(
-        `[API AUTH ERROR] ${endpoint}: 401 Unauthorized`
-      );
-
       clearSession();
 
       throw new Error(
-        `Authentication expired or invalid for ${endpoint}. ` +
-        `Please log in again.`
+        "Your session has expired or is invalid. Please log in again."
       );
     }
 
-    // --------------------------------------------------------
-    // Permission failure
-    // --------------------------------------------------------
-
-    if (
-      response.status === 403
-    ) {
+    // Permission error
+    if (response.status === 403) {
       throw new Error(
-        `You do not have permission to access ${endpoint}. ` +
-        `Your account must have the Medical Supervisor role.`
+        message ||
+          "You do not have permission to access this resource."
       );
     }
 
-    // --------------------------------------------------------
     // Not found
-    // --------------------------------------------------------
-
-    if (
-      response.status === 404
-    ) {
+    if (response.status === 404) {
       throw new Error(
         `API endpoint not found: ${endpoint}`
       );
     }
 
-    // --------------------------------------------------------
     // Server error
-    // --------------------------------------------------------
-
-    if (
-      response.status >= 500
-    ) {
+    if (response.status >= 500) {
       throw new Error(
-        `Backend error ${response.status} from ${endpoint}: ${message}`
+        `Backend error ${response.status}: ${message}`
       );
     }
 
@@ -518,567 +476,647 @@ const api = {
     );
   },
 
-  getMedicalDiseases:
-    async () => {
-      return request(
-        "/medical/diseases"
-      );
-    },
+  getMedicalDiseases: async () => {
+    return request(
+      "/medical/diseases"
+    );
+  },
 
   // ==========================================================
   // EMERGING DISEASES
   // ==========================================================
 
-  getEmergingDiseases:
-    async () => {
-      return request(
-        "/medical/emerging"
-      );
-    },
+  getEmergingDiseases: async () => {
+    return request(
+      "/medical/emerging"
+    );
+  },
 
-  getMedicalEmergingDiseases:
-    async () => {
-      return request(
-        "/medical/emerging"
-      );
-    },
+  getMedicalEmergingDiseases: async () => {
+    return request(
+      "/medical/emerging"
+    );
+  },
 
   // ==========================================================
-  // MEDICAL OVERVIEW
+  // MEDICAL SUPERVISOR OVERVIEW
   // ==========================================================
 
-  getMedicalOverview:
-    async (talukId) => {
-      return request(
-        "/medical/overview",
-        {
-          params:
-            talukId !== undefined &&
-            talukId !== null &&
-            talukId !== ""
-              ? {
-                  taluk_id:
-                    talukId,
-                }
-              : undefined,
-        }
-      );
-    },
+  getMedicalOverview: async (
+    talukId
+  ) => {
+    return request(
+      "/medical/overview",
+      {
+        params:
+          talukId !== undefined &&
+          talukId !== null &&
+          talukId !== ""
+            ? {
+                taluk_id: talukId,
+              }
+            : undefined,
+      }
+    );
+  },
 
   // ==========================================================
-  // MEDICAL REPORTS
+  // MEDICAL SUPERVISOR REPORTS
   // ==========================================================
 
-  getMedicalReports:
-    async (params = {}) => {
-      return request(
-        "/medical/reports",
-        {
-          params,
-        }
-      );
-    },
+  getMedicalReports: async (
+    params = {}
+  ) => {
+    return request(
+      "/medical/reports",
+      {
+        params,
+      }
+    );
+  },
+
+  createMedicalReport: async (
+    payload
+  ) => {
+    return request(
+      "/medical/reports",
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+  },
 
   // ==========================================================
   // WEEKLY MONITORING
   // ==========================================================
 
-  getMedicalMonitoring:
-    async (weekNumber) => {
-      return request(
-        "/medical/monitoring",
-        {
-          params:
-            weekNumber !==
-              undefined &&
-            weekNumber !== null
-              ? {
-                  week_number:
-                    weekNumber,
-                }
-              : undefined,
-        }
-      );
-    },
+  // Supports BOTH:
+  //
+  // api.getMedicalMonitoring()
+  //
+  // and:
+  //
+  // api.getMedicalMonitoring(202635)
+  //
+  // and:
+  //
+  // api.getMedicalMonitoring({
+  //   week_number: 202635
+  // })
+
+  getMedicalMonitoring: async (
+    weekOrOptions
+  ) => {
+    let params = {};
+
+    if (
+      typeof weekOrOptions === "number" ||
+      typeof weekOrOptions === "string"
+    ) {
+      params.week_number = weekOrOptions;
+    } else if (
+      weekOrOptions &&
+      typeof weekOrOptions === "object"
+    ) {
+      params = {
+        ...weekOrOptions,
+      };
+    }
+
+    return request(
+      "/medical/monitoring",
+      {
+        params,
+      }
+    );
+  },
 
   // ==========================================================
   // ANALYTICS
   // ==========================================================
 
-  getMedicalAnalytics:
-    async (weeks = 4) => {
-      return request(
-        "/medical/analytics",
-        {
-          params: {
-            weeks,
-          },
-        }
-      );
-    },
+  getMedicalAnalytics: async (
+    weeks = 8
+  ) => {
+    return request(
+      "/medical/analytics",
+      {
+        params: {
+          weeks,
+        },
+      }
+    );
+  },
 
   // ==========================================================
   // RISK MAP
   // ==========================================================
 
-  getMedicalRiskMap:
-    async (disease = "") => {
-      return request(
-        "/medical/risk-map",
-        {
-          params: disease
-            ? {
-                disease,
-              }
-            : undefined,
-        }
-      );
-    },
+  getMedicalRiskMap: async (
+    disease = ""
+  ) => {
+    return request(
+      "/medical/risk-map",
+      {
+        params: disease
+          ? {
+              disease,
+            }
+          : undefined,
+      }
+    );
+  },
 
   // ==========================================================
-  // EMERGING REVIEW
+  // EMERGING DISEASE REVIEW
   // ==========================================================
 
-  reviewEmergingDisease:
-    async (
-      reportId,
-      payload
-    ) => {
-      return request(
-        `/medical/emerging/${reportId}/review`,
-        {
-          method: "PUT",
-          body: payload,
-        }
-      );
-    },
+  reviewEmergingDisease: async (
+    reportId,
+    payload
+  ) => {
+    return request(
+      `/medical/emerging/${reportId}/review`,
+      {
+        method: "PUT",
+        body: payload,
+      }
+    );
+  },
 
   // ==========================================================
   // SUPERVISOR AGENTS
   // ==========================================================
 
-  getSupervisorAgents:
-    async () => {
-      return request(
-        "/medical/agents"
-      );
-    },
+  getSupervisorAgents: async () => {
+    return request(
+      "/medical/agents"
+    );
+  },
 
-  getSupervisorAgentIssues:
-    async () => {
-      return request(
-        "/medical/agent-issues"
-      );
-    },
+  getSupervisorAgentIssues: async () => {
+    return request(
+      "/medical/agent-issues"
+    );
+  },
 
-  // ----------------------------------------------------------
-  // FIX:
+  // ==========================================================
   // SUBMIT AGENT ISSUE
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  submitAgentIssue:
-    async (payload) => {
-      const formData = new FormData();
-      formData.append("agent_id", String(Number(payload?.agent_id)));
-      formData.append("issue_type", String(payload?.issue_type || "").trim());
-      formData.append("severity", String(payload?.severity || "Medium").trim());
-      formData.append("description", String(payload?.description || "").trim());
-      formData.append("evidence", String(payload?.evidence || "").trim());
-      (payload?.files || []).forEach((file) => formData.append("proof", file));
+  submitAgentIssue: async (
+    payload
+  ) => {
+    const formData = new FormData();
 
-      const token = getToken();
-      const response = await fetch(`${API_BASE}/medical/agent-issues`, {
+    formData.append(
+      "agent_id",
+      String(
+        Number(payload?.agent_id)
+      )
+    );
+
+    formData.append(
+      "issue_type",
+      String(
+        payload?.issue_type || ""
+      ).trim()
+    );
+
+    formData.append(
+      "severity",
+      String(
+        payload?.severity || "Medium"
+      ).trim()
+    );
+
+    formData.append(
+      "description",
+      String(
+        payload?.description || ""
+      ).trim()
+    );
+
+    formData.append(
+      "evidence",
+      String(
+        payload?.evidence || ""
+      ).trim()
+    );
+
+    if (
+      Array.isArray(payload?.files)
+    ) {
+      payload.files.forEach(
+        (file) => {
+          if (file) {
+            formData.append(
+              "proof",
+              file
+            );
+          }
+        }
+      );
+    }
+
+    return request(
+      "/medical/agent-issues",
+      {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(getErrorMessage(data?.detail || data?.message));
-      return data;
-    },
+      }
+    );
+  },
 
-  remindSupervisorAgent:
-    async (agentId) => {
-      return request(`/medical/agents/${agentId}/remind`, { method: "POST" });
-    },
+  // ==========================================================
+  // REMIND AGENT
+  // ==========================================================
+
+  remindSupervisorAgent: async (
+    agentId
+  ) => {
+    return request(
+      `/medical/agents/${agentId}/remind`,
+      {
+        method: "POST",
+      }
+    );
+  },
 
   // ==========================================================
   // AGENT
   // ==========================================================
 
-  getAgentEmerging:
-    async () => {
-      return request(
-        "/agent/emerging"
-      );
-    },
+  getAgentEmerging: async () => {
+    return request(
+      "/agent/emerging"
+    );
+  },
 
-  getMyEmergingReports:
-    async () => {
-      return request(
-        "/agent/emerging/mine"
-      );
-    },
+  getMyEmergingReports: async () => {
+    return request(
+      "/agent/emerging/mine"
+    );
+  },
 
   // ==========================================================
   // ADMIN
   // ==========================================================
 
-  getAdminStats:
-    async () => {
-      return request(
-        "/admin/stats"
-      );
-    },
+  getAdminStats: async () => {
+    return request(
+      "/admin/stats"
+    );
+  },
 
-  getAgentIssues:
-    async () => {
-      return request(
-        "/admin/agent-issues"
-      );
-    },
+  getAgentIssues: async () => {
+    return request(
+      "/admin/agent-issues"
+    );
+  },
 
-  reviewAgentIssue:
-    async (
-      issueId,
-      payload
-    ) => {
-      return request(
-        `/admin/agent-issues/${issueId}/review`,
-        {
-          method: "PUT",
-          body: payload,
-        }
-      );
-    },
+  reviewAgentIssue: async (
+    issueId,
+    payload
+  ) => {
+    return request(
+      `/admin/agent-issues/${issueId}/review`,
+      {
+        method: "PUT",
+        body: payload,
+      }
+    );
+  },
 
-  getAllReports:
-    async (params = {}) => {
-      return request(
-        "/admin/reports",
-        {
-          params,
-        }
-      );
-    },
+  getAllReports: async (
+    params = {}
+  ) => {
+    return request(
+      "/admin/reports",
+      {
+        params,
+      }
+    );
+  },
 
-  runPredictions:
-    async () => {
-      return request(
-        "/admin/predictions/run",
-        {
-          method: "POST",
-        }
-      );
-    },
+  runPredictions: async () => {
+    return request(
+      "/admin/predictions/run",
+      {
+        method: "POST",
+      }
+    );
+  },
 
-  getLatestPredictions:
-    async (params = {}) => {
-      return request(
-        "/admin/predictions",
-        {
-          params,
-        }
-      );
-    },
+  getLatestPredictions: async (
+    params = {}
+  ) => {
+    return request(
+      "/admin/predictions",
+      {
+        params,
+      }
+    );
+  },
 
-  listAdminNotifications:
-    async () => {
-      return request(
-        "/admin/notifications"
-      );
-    },
+  listAdminNotifications: async () => {
+    return request(
+      "/admin/notifications"
+    );
+  },
 
-  createNotification:
-    async (payload) => {
-      return request(
-        "/admin/notifications",
-        {
-          method: "POST",
-          body: payload,
-        }
-      );
-    },
+  createNotification: async (
+    payload
+  ) => {
+    return request(
+      "/admin/notifications",
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+  },
 
   // ==========================================================
   // ACTIVITY LOGS
   // ==========================================================
 
-  getActivityLogs:
-    async () => {
-      return request(
-        "/admin/activity-logs"
-      );
-    },
+  getActivityLogs: async () => {
+    return request(
+      "/admin/activity-logs"
+    );
+  },
 
   // ==========================================================
   // HOME RELIEF
   // ==========================================================
 
-  searchHomeRelief:
-    async (query) => {
-      const searchText =
-        String(query || "").trim();
+  searchHomeRelief: async (
+    query
+  ) => {
+    const searchText =
+      String(query || "").trim();
 
-      if (!searchText) {
-        return emptyHomeReliefResponse();
+    if (!searchText) {
+      return emptyHomeReliefResponse();
+    }
+
+    return request(
+      "/home-relief/search",
+      {
+        params: {
+          q: searchText,
+        },
       }
+    );
+  },
 
-      return request(
-        "/home-relief/search",
-        {
-          params: {
-            q: searchText,
-          },
-        }
-      );
-    },
+  getHomeRelief: async (
+    query
+  ) => {
+    const searchText =
+      String(query || "").trim();
 
-  getHomeRelief:
-    async (query) => {
-      const searchText =
-        String(query || "").trim();
+    if (!searchText) {
+      return emptyHomeReliefResponse();
+    }
 
-      if (!searchText) {
-        return emptyHomeReliefResponse();
+    return request(
+      "/home-relief/search",
+      {
+        params: {
+          q: searchText,
+        },
       }
+    );
+  },
 
-      return request(
-        "/home-relief/search",
-        {
-          params: {
-            q: searchText,
-          },
-        }
-      );
-    },
-
-  getHomeReliefRemedy:
-    async (
-      remedyId,
-      options = {}
-    ) => {
-      return request(
-        `/home-relief/${remedyId}`,
-        {
-          params: options,
-        }
-      );
-    },
-
-  getHomeReliefSafety:
-    async (
-      remedyId,
-      condition = null
-    ) => {
-      return request(
-        `/home-relief/${remedyId}/safety`,
-        {
-          params: condition
-            ? {
-                condition,
-              }
-            : undefined,
-        }
-      );
-    },
-
-  getHomeReliefAlternatives:
-    async (
-      remedyId,
-      condition = null
-    ) => {
-      return request(
-        `/home-relief/${remedyId}/alternatives`,
-        {
-          params: condition
-            ? {
-                condition,
-              }
-            : undefined,
-        }
-      );
-    },
-
-  searchHomeReliefWithContext:
-    async (
-      query,
-      context = {}
-    ) => {
-      const searchText =
-        String(query || "").trim();
-
-      if (!searchText) {
-        return emptyHomeReliefResponse();
+  getHomeReliefRemedy: async (
+    remedyId,
+    options = {}
+  ) => {
+    return request(
+      `/home-relief/${remedyId}`,
+      {
+        params: options,
       }
+    );
+  },
 
-      return request(
-        "/home-relief/search",
-        {
-          params: {
-            q: searchText,
-            ...context,
-          },
-        }
-      );
-    },
+  getHomeReliefSafety: async (
+    remedyId,
+    condition = null
+  ) => {
+    return request(
+      `/home-relief/${remedyId}/safety`,
+      {
+        params: condition
+          ? {
+              condition,
+            }
+          : undefined,
+      }
+    );
+  },
+
+  getHomeReliefAlternatives: async (
+    remedyId,
+    condition = null
+  ) => {
+    return request(
+      `/home-relief/${remedyId}/alternatives`,
+      {
+        params: condition
+          ? {
+              condition,
+            }
+          : undefined,
+      }
+    );
+  },
+
+  searchHomeReliefWithContext: async (
+    query,
+    context = {}
+  ) => {
+    const searchText =
+      String(query || "").trim();
+
+    if (!searchText) {
+      return emptyHomeReliefResponse();
+    }
+
+    return request(
+      "/home-relief/search",
+      {
+        params: {
+          q: searchText,
+          ...context,
+        },
+      }
+    );
+  },
 
   // ==========================================================
   // MEDICAL HOME RELIEF
   // ==========================================================
 
-  getSupervisorHomeRelief:
-    async (params = {}) => {
-      return request(
-        "/medical/home-relief",
-        {
-          params,
-        }
-      );
-    },
+  getSupervisorHomeRelief: async (
+    params = {}
+  ) => {
+    return request(
+      "/medical/home-relief",
+      {
+        params,
+      }
+    );
+  },
 
-  getMedicalHomeRelief:
-    async (params = {}) => {
-      return request(
-        "/medical/home-relief",
-        {
-          params,
-        }
-      );
-    },
+  getMedicalHomeRelief: async (
+    params = {}
+  ) => {
+    return request(
+      "/medical/home-relief",
+      {
+        params,
+      }
+    );
+  },
 
-  getMedicalHomeReliefs:
-    async (params = {}) => {
-      return request(
-        "/medical/home-relief",
-        {
-          params,
-        }
-      );
-    },
+  getMedicalHomeReliefs: async (
+    params = {}
+  ) => {
+    return request(
+      "/medical/home-relief",
+      {
+        params,
+      }
+    );
+  },
 
-  getSupervisorMedicalHomeRelief:
-    async (params = {}) => {
-      return request(
-        "/medical/home-relief",
-        {
-          params,
-        }
-      );
-    },
+  getSupervisorMedicalHomeRelief: async (
+    params = {}
+  ) => {
+    return request(
+      "/medical/home-relief",
+      {
+        params,
+      }
+    );
+  },
 
-  createHomeRelief:
-    async (payload) => {
-      return request(
-        "/medical/home-relief",
-        {
-          method: "POST",
-          body: payload,
-        }
-      );
-    },
+  createHomeRelief: async (
+    payload
+  ) => {
+    return request(
+      "/medical/home-relief",
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+  },
 
-  updateHomeRelief:
-    async (
-      remedyId,
-      payload
-    ) => {
-      return request(
-        `/medical/home-relief/${remedyId}`,
-        {
-          method: "PATCH",
-          body: payload,
-        }
-      );
-    },
+  updateHomeRelief: async (
+    remedyId,
+    payload
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}`,
+      {
+        method: "PATCH",
+        body: payload,
+      }
+    );
+  },
 
-  deleteHomeRelief:
-    async (remedyId) => {
-      return request(
-        `/medical/home-relief/${remedyId}`,
-        {
-          method: "DELETE",
-        }
-      );
-    },
+  deleteHomeRelief: async (
+    remedyId
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  },
 
-  deactivateHomeRelief:
-    async (remedyId) => {
-      return request(
-        `/medical/home-relief/${remedyId}/deactivate`,
-        {
-          method: "POST",
-        }
-      );
-    },
+  deactivateHomeRelief: async (
+    remedyId
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/deactivate`,
+      {
+        method: "POST",
+      }
+    );
+  },
 
-  createHomeReliefSafetyRule:
-    async (
-      remedyId,
-      payload
-    ) => {
-      return request(
-        `/medical/home-relief/${remedyId}/safety-rules`,
-        {
-          method: "POST",
-          body: payload,
-        }
-      );
-    },
+  createHomeReliefSafetyRule: async (
+    remedyId,
+    payload
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/safety-rules`,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+  },
 
-  updateHomeReliefSafetyRule:
-    async (
-      remedyId,
-      ruleId,
-      payload
-    ) => {
-      return request(
-        `/medical/home-relief/${remedyId}/safety-rules/${ruleId}`,
-        {
-          method: "PUT",
-          body: payload,
-        }
-      );
-    },
+  updateHomeReliefSafetyRule: async (
+    remedyId,
+    ruleId,
+    payload
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/safety-rules/${ruleId}`,
+      {
+        method: "PUT",
+        body: payload,
+      }
+    );
+  },
 
-  deleteHomeReliefSafetyRule:
-    async (
-      remedyId,
-      ruleId
-    ) => {
-      return request(
-        `/medical/home-relief/${remedyId}/safety-rules/${ruleId}`,
-        {
-          method: "DELETE",
-        }
-      );
-    },
+  deleteHomeReliefSafetyRule: async (
+    remedyId,
+    ruleId
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/safety-rules/${ruleId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  },
 
-  approveHomeRelief:
-    async (remedyId) => {
-      return request(
-        `/medical/home-relief/${remedyId}/approve`,
-        {
-          method: "POST",
-        }
-      );
-    },
+  approveHomeRelief: async (
+    remedyId
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/approve`,
+      {
+        method: "POST",
+      }
+    );
+  },
 
-  rejectHomeRelief:
-    async (
-      remedyId,
-      reason
-    ) => {
-      return request(
-        `/medical/home-relief/${remedyId}/reject`,
-        {
-          method: "POST",
-          body: {
-            reason,
-          },
-        }
-      );
-    },
+  rejectHomeRelief: async (
+    remedyId,
+    reason
+  ) => {
+    return request(
+      `/medical/home-relief/${remedyId}/reject`,
+      {
+        method: "POST",
+        body: {
+          reason,
+        },
+      }
+    );
+  },
 
   // ==========================================================
   // GENERIC
@@ -1124,7 +1162,7 @@ export {
 };
 
 // ============================================================
-// DEFAULT
+// DEFAULT EXPORT
 // ============================================================
 
 export default api;
