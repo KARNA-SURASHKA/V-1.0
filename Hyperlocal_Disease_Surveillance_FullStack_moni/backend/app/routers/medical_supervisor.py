@@ -10,7 +10,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .. import auth, models, schemas
@@ -118,6 +118,73 @@ def report_query(
     )
 
     return district, query
+
+
+# ============================================================
+# DISEASE REPORT REVIEW STORAGE
+# ============================================================
+
+def ensure_disease_report_review_columns(db: Session):
+    """
+    Ensure the existing SQLite disease_reports table has the fields
+    required by the Medical Supervisor review workflow.
+
+    This is intentionally backward-compatible with an existing
+    surveillance.db so existing reports are preserved.
+    """
+    try:
+        columns = {
+            row[1]
+            for row in db.execute(
+                text("PRAGMA table_info(disease_reports)")
+            ).fetchall()
+        }
+
+        if "review_status" not in columns:
+            db.execute(
+                text(
+                    """
+                    ALTER TABLE disease_reports
+                    ADD COLUMN review_status VARCHAR(30)
+                    DEFAULT 'PENDING_REVIEW'
+                    """
+                )
+            )
+
+        if "review_notes" not in columns:
+            db.execute(
+                text(
+                    """
+                    ALTER TABLE disease_reports
+                    ADD COLUMN review_notes TEXT
+                    """
+                )
+            )
+
+        if "reviewed_by" not in columns:
+            db.execute(
+                text(
+                    """
+                    ALTER TABLE disease_reports
+                    ADD COLUMN reviewed_by INTEGER
+                    """
+                )
+            )
+
+        if "reviewed_at" not in columns:
+            db.execute(
+                text(
+                    """
+                    ALTER TABLE disease_reports
+                    ADD COLUMN reviewed_at DATETIME
+                    """
+                )
+            )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 # ============================================================
@@ -726,6 +793,8 @@ def reports(
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
+    ensure_disease_report_review_columns(db)
+
     district, taluk_ids = district_taluk_ids(
         db,
         user,
@@ -881,9 +950,37 @@ def reports(
         else:
             priority = "Low"
 
-        # Current database does not persist
-        # review status for DiseaseReport.
-        report_status = "Pending Review"
+        review_row = db.execute(
+            text(
+                """
+                SELECT
+                    review_status,
+                    review_notes,
+                    reviewed_by,
+                    reviewed_at
+                FROM disease_reports
+                WHERE id = :report_id
+                """
+            ),
+            {"report_id": report.id},
+        ).fetchone()
+
+        raw_status = (
+            review_row[0]
+            if review_row and review_row[0]
+            else "PENDING_REVIEW"
+        )
+
+        status_labels = {
+            "PENDING_REVIEW": "Pending Review",
+            "APPROVED": "Approved",
+            "REJECTED": "Rejected",
+        }
+
+        report_status = status_labels.get(
+            raw_status,
+            "Pending Review",
+        )
 
         if (
             status
@@ -938,6 +1035,22 @@ def reports(
                 ),
 
                 "status": report_status,
+                "review_status": raw_status,
+                "review_notes": (
+                    review_row[1]
+                    if review_row
+                    else None
+                ),
+                "reviewed_by": (
+                    review_row[2]
+                    if review_row
+                    else None
+                ),
+                "reviewed_at": (
+                    review_row[3]
+                    if review_row
+                    else None
+                ),
             }
         )
 
@@ -960,6 +1073,8 @@ def create_medical_report(
     The supervisor can only create reports for agents
     belonging to the assigned district.
     """
+
+    ensure_disease_report_review_columns(db)
 
     _, allowed_taluk_ids = district_taluk_ids(
         db,
@@ -1126,6 +1241,130 @@ def create_medical_report(
             "successfully."
         ),
         "status": "Pending Review",
+    }
+
+
+# ============================================================
+# REVIEW NORMAL DISEASE REPORT
+# ============================================================
+
+@router.put("/reports/{report_id}/review")
+def review_disease_report(
+    report_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(supervisor_only),
+):
+    """
+    Approve, reject, or keep a normal disease report pending.
+
+    Review status is stored in the existing SQLite database so the
+    decision survives page refreshes and backend restarts.
+    """
+    ensure_disease_report_review_columns(db)
+
+    _, taluk_ids = district_taluk_ids(
+        db,
+        user,
+    )
+
+    report = (
+        db.query(models.DiseaseReport)
+        .filter(
+            models.DiseaseReport.id == report_id
+        )
+        .first()
+    )
+
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="Disease report not found.",
+        )
+
+    if report.taluk_id not in taluk_ids:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This report is outside your "
+                "assigned district."
+            ),
+        )
+
+    decision = str(
+        payload.get("decision") or ""
+    ).strip().upper()
+
+    review_notes = str(
+        payload.get("review_notes") or ""
+    ).strip()
+
+    decision_map = {
+        "APPROVE": "APPROVED",
+        "APPROVED": "APPROVED",
+        "REJECT": "REJECTED",
+        "REJECTED": "REJECTED",
+        "KEEP_PENDING": "PENDING_REVIEW",
+        "PENDING": "PENDING_REVIEW",
+        "PENDING_REVIEW": "PENDING_REVIEW",
+    }
+
+    new_status = decision_map.get(decision)
+
+    if not new_status:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid review decision. Use "
+                "APPROVE, REJECT or KEEP_PENDING."
+            ),
+        )
+
+    now = datetime.utcnow()
+
+    db.execute(
+        text(
+            """
+            UPDATE disease_reports
+            SET
+                review_status = :review_status,
+                review_notes = :review_notes,
+                reviewed_by = :reviewed_by,
+                reviewed_at = :reviewed_at,
+                updated_at = :updated_at
+            WHERE id = :report_id
+            """
+        ),
+        {
+            "review_status": new_status,
+            "review_notes": review_notes or None,
+            "reviewed_by": user.id,
+            "reviewed_at": now,
+            "updated_at": now,
+            "report_id": report_id,
+        },
+    )
+
+    db.commit()
+
+    status_label = {
+        "APPROVED": "Approved",
+        "REJECTED": "Rejected",
+        "PENDING_REVIEW": "Pending Review",
+    }[new_status]
+
+    return {
+        "ok": True,
+        "id": report.id,
+        "report_id": f"RPT-{report.id:04d}",
+        "status": status_label,
+        "review_status": new_status,
+        "review_notes": review_notes or None,
+        "reviewed_by": user.id,
+        "reviewed_at": now,
+        "message": (
+            f"Report marked as {status_label}."
+        ),
     }
 
 

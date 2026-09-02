@@ -11,32 +11,15 @@ import {
 
 import api from "../../api";
 
-import MedicalSupervisorLayout
-  from "./components/MedicalSupervisorLayout";
-
-import Overview
-  from "./components/Overview";
-
-import DiseaseReports
-  from "./components/DiseaseReports";
-
-import WeeklyMonitoring
-  from "./components/WeeklyMonitoring";
-
-import RiskMap
-  from "./components/RiskMap";
-
-import SurveillanceAnalytics
-  from "./components/SurveillanceAnalytics";
-
-import AgentOversight
-  from "./components/AgentOversight";
-
-import Alerts
-  from "./components/Alerts";
-
-import HomeReliefManagement
-  from "./HomeReliefManagement";
+import MedicalSupervisorLayout from "./components/MedicalSupervisorLayout";
+import Overview from "./components/Overview";
+import DiseaseReports from "./components/DiseaseReports";
+import WeeklyMonitoring from "./components/WeeklyMonitoring";
+import RiskMap from "./components/RiskMap";
+import SurveillanceAnalytics from "./components/SurveillanceAnalytics";
+import AgentOversight from "./components/AgentOversight";
+import Alerts from "./components/Alerts";
+import HomeReliefManagement from "./HomeReliefManagement";
 
 import {
   Loading,
@@ -46,404 +29,343 @@ import {
 export default function MedicalSupervisorPortal({
   onExit,
 }) {
+  const [
+    tab,
+    setTab,
+  ] = useState(
+    "overview"
+  );
 
-  const [tab, setTab] =
-    useState("overview");
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [
+    error,
+    setError,
+  ] = useState("");
 
-  const [error, setError] =
-    useState("");
-
-  const [monitoringWeek, setMonitoringWeek] =
-    useState(null);
-
-  const [data, setData] = useState({
+  const [
+    data,
+    setData,
+  ] = useState({
     overview: null,
-
     reports: [],
-
-    monitoring: {
-      district: null,
-      week: null,
-      summary: {
-        total_agents: 0,
-        on_time: 0,
-        late: 0,
-        missed: 0,
-        pending: 0,
-        compliance_percent: 0,
-        repeated_missed: 0,
-      },
-      follow_up: [],
-      rows: [],
-      available_weeks: [],
-    },
-
+    monitoring: [],
     analytics: null,
-
     riskMap: [],
-
     emerging: [],
-
     agents: [],
-
     issues: [],
-
     diseases: [],
   });
 
 
-  // ==========================================================
-  // LOAD EVERYTHING
-  // ==========================================================
+  /* ==========================================================
+     LOAD ALL MEDICAL SUPERVISOR DATA
+  ========================================================== */
 
-  const load = useCallback(
-    async (
-      showSpinner = true,
-      selectedWeek = monitoringWeek
-    ) => {
+  const load =
+    useCallback(
+      async (
+        showSpinner = true
+      ) => {
+        try {
+          setError("");
 
-      try {
+          if (
+            showSpinner
+          ) {
+            setRefreshing(
+              true
+            );
+          }
 
-        setError("");
+          const [
+            overview,
+            reports,
+            monitoring,
+            analytics,
+            riskMap,
+            emerging,
+            agents,
+            issues,
+            diseases,
+          ] =
+            await Promise.all([
+              api.getMedicalOverview(),
 
-        if (showSpinner) {
-          setRefreshing(true);
-        }
+              api.getMedicalReports(),
 
-        const weekNumber =
-          selectedWeek?.week_number ?? null;
+              api.getMedicalMonitoring(),
 
-        const year =
-          selectedWeek?.year ?? null;
+              api.getMedicalAnalytics(
+                8
+              ),
 
+              api.getMedicalRiskMap(),
 
-        const [
-          overview,
-          reports,
-          monitoring,
-          analytics,
-          riskMap,
-          emerging,
-          agents,
-          issues,
-          diseases,
-        ] = await Promise.all([
-          api.getMedicalOverview(),
+              api.getMedicalEmergingDiseases(),
 
-          api.getMedicalReports(),
+              api.getSupervisorAgents(),
 
-          api.getMedicalMonitoring(
-            weekNumber,
-            year
-          ),
+              api.getSupervisorAgentIssues(),
 
-          api.getMedicalAnalytics(8),
+              api.getMedicalDiseases(),
+            ]);
 
-          api.getMedicalRiskMap(),
+          setData({
+            overview,
 
-          api.getMedicalEmergingDiseases(),
+            reports:
+              Array.isArray(
+                reports
+              )
+                ? reports
+                : [],
 
-          api.getSupervisorAgents(),
+            monitoring:
+              Array.isArray(
+                monitoring
+              )
+                ? monitoring
+                : [],
 
-          api.getSupervisorAgentIssues(),
+            analytics,
 
-          api.getMedicalDiseases(),
-        ]);
+            riskMap:
+              Array.isArray(
+                riskMap
+              )
+                ? riskMap
+                : [],
 
+            emerging:
+              Array.isArray(
+                emerging
+              )
+                ? emerging
+                : [],
 
-        const normalizedMonitoring =
-          monitoring &&
-          !Array.isArray(monitoring)
-            ? monitoring
-            : {
-                district: null,
+            agents:
+              Array.isArray(
+                agents
+              )
+                ? agents
+                : [],
 
-                week: null,
+            issues:
+              Array.isArray(
+                issues
+              )
+                ? issues
+                : [],
 
-                summary: {
-                  total_agents: Array.isArray(
-                    monitoring
-                  )
-                    ? monitoring.length
-                    : 0,
-
-                  on_time: 0,
-
-                  late: 0,
-
-                  missed: 0,
-
-                  pending: 0,
-
-                  compliance_percent: 0,
-
-                  repeated_missed: 0,
-                },
-
-                follow_up: [],
-
-                rows: Array.isArray(
-                  monitoring
-                )
-                  ? monitoring
-                  : [],
-
-                available_weeks: [],
-              };
-
-
-        setData({
-          overview,
-
-          reports:
-            Array.isArray(reports)
-              ? reports
-              : [],
-
-          monitoring:
-            normalizedMonitoring,
-
-          analytics,
-
-          riskMap:
-            Array.isArray(riskMap)
-              ? riskMap
-              : [],
-
-          emerging:
-            Array.isArray(emerging)
-              ? emerging
-              : [],
-
-          agents:
-            Array.isArray(agents)
-              ? agents
-              : [],
-
-          issues:
-            Array.isArray(issues)
-              ? issues
-              : [],
-
-          diseases:
-            Array.isArray(diseases)
-              ? diseases
-              : [],
-        });
-
-
-        // Backend chooses last completed week
-        // when no week is supplied.
-        if (
-          !selectedWeek &&
-          normalizedMonitoring.week
+            diseases:
+              Array.isArray(
+                diseases
+              )
+                ? diseases
+                : [],
+          });
+        } catch (
+          e
         ) {
-          setMonitoringWeek(
-            normalizedMonitoring.week
+          console.error(
+            "Medical Supervisor load error:",
+            e
+          );
+
+          setError(
+            e?.message ||
+              "Unable to load Medical Supervisor data."
+          );
+        } finally {
+          setLoading(
+            false
+          );
+
+          setRefreshing(
+            false
           );
         }
-
-      } catch (e) {
-
-        console.error(
-          "Medical Supervisor load error:",
-          e
-        );
-
-        setError(
-          e?.message ||
-            "Unable to load Medical Supervisor data."
-        );
-
-      } finally {
-
-        setLoading(false);
-
-        setRefreshing(false);
-      }
-    },
-    [monitoringWeek]
-  );
-
-
-  useEffect(() => {
-    load(true, null);
-  }, []);
-
-
-  // ==========================================================
-  // REFRESH
-  // ==========================================================
-
-  const refreshAll = useCallback(
-    () => {
-      load(true, monitoringWeek);
-    },
-    [load, monitoringWeek]
-  );
-
-
-  // ==========================================================
-  // CHANGE MONITORING WEEK
-  // ==========================================================
-
-  const changeMonitoringWeek =
-    useCallback(
-      async (week) => {
-
-        if (!week) {
-          return;
-        }
-
-        setMonitoringWeek(week);
-
-        await load(
-          true,
-          week
-        );
       },
-      [load]
+      []
     );
 
 
-  // ==========================================================
-  // REMIND ONE AGENT
-  // ==========================================================
+  useEffect(() => {
+    load(true);
+  }, [load]);
+
+
+  /* ==========================================================
+     AGENT REMINDER
+  ========================================================== */
 
   const remindAgent =
-    async (agent) => {
+    async (
+      agent
+    ) => {
+      await api.remindSupervisorAgent(
+        agent.id
+      );
 
-      try {
-
-        await api.remindSupervisorAgent(
-          agent.agent_id ??
-          agent.id
-        );
-
-        await load(
-          false,
-          monitoringWeek
-        );
-
-      } catch (e) {
-
-        setError(
-          e?.message ||
-            "Unable to send reminder."
-        );
-      }
+      await load(
+        false
+      );
     };
 
 
-  // ==========================================================
-  // REMIND ALL FOLLOW-UP AGENTS
-  // ==========================================================
-
-  const remindAllMonitoringAgents =
-    async () => {
-
-      try {
-
-        await api.remindAllMonitoringAgents(
-          monitoringWeek?.week_number,
-          monitoringWeek?.year
-        );
-
-        await load(
-          false,
-          monitoringWeek
-        );
-
-      } catch (e) {
-
-        setError(
-          e?.message ||
-            "Unable to send weekly reminders."
-        );
-      }
-    };
-
-
-  // ==========================================================
-  // AGENT ISSUE
-  // ==========================================================
+  /* ==========================================================
+     AGENT ISSUE
+  ========================================================== */
 
   const submitIssue =
-    async (payload) => {
-
+    async (
+      payload
+    ) => {
       await api.submitAgentIssue(
         payload
       );
 
       await load(
-        false,
-        monitoringWeek
+        false
       );
     };
 
 
-  // ==========================================================
-  // CREATE REPORT
-  // ==========================================================
+  /* ==========================================================
+     NORMAL DISEASE REPORT REVIEW
+  ========================================================== */
 
-  const createMedicalReport =
-    async (payload) => {
-
-      await api.createMedicalReport(
-        payload
-      );
-
-      await load(
-        false,
-        monitoringWeek
-      );
-    };
-
-
-  // ==========================================================
-  // EMERGING DISEASE REVIEW
-  // ==========================================================
-
-  const reviewEmerging =
+  const reviewMedicalReport =
     async (
-      id,
-      decision,
-      notes,
-      extra = {}
+      report,
+      decision
     ) => {
-
-      await api.reviewEmergingDisease(
-        id,
+      await api.reviewMedicalReport(
+        report.id,
         {
           decision,
           review_notes:
-            notes || "",
-          ...extra,
+            "",
         }
       );
 
       await load(
-        false,
-        monitoringWeek
+        false
       );
     };
 
 
-  // ==========================================================
-  // ALERT COUNT
-  // ==========================================================
+  /* ==========================================================
+     EMERGING DISEASE REVIEW
+  ========================================================== */
+
+  const reviewEmerging =
+    async (
+      report,
+      decision
+    ) => {
+      let backendDecision =
+        decision;
+
+      if (
+        decision ===
+        "APPROVE"
+      ) {
+        /*
+          Existing emerging-disease workflow requires
+          an approved disease mapping.
+
+          If the report already has a mapped disease,
+          verify it.
+
+          If not, do not invent a disease entry.
+        */
+
+        if (
+          report.mapped_disease_id
+        ) {
+          backendDecision =
+            "VERIFY_EXISTING";
+        } else {
+          throw new Error(
+            "This emerging report has not been mapped to an approved disease yet."
+          );
+        }
+      }
+
+      if (
+        decision ===
+        "KEEP_PENDING"
+      ) {
+        backendDecision =
+          "KEEP_PENDING";
+      }
+
+      if (
+        decision ===
+        "REJECT"
+      ) {
+        backendDecision =
+          "REJECT";
+      }
+
+      await api.reviewEmergingDisease(
+        report.original_id ||
+          report.id,
+        {
+          decision:
+            backendDecision,
+
+          mapped_disease_id:
+            report.mapped_disease_id ||
+            undefined,
+
+          review_notes:
+            "",
+        }
+      );
+
+      await load(
+        false
+      );
+    };
+
+
+  /* ==========================================================
+     ALERT COUNT
+  ========================================================== */
 
   const alertCount =
-    (data.overview?.high_risk_alerts || 0) +
-    (data.overview?.pending_emerging_reviews || 0) +
-    (data.overview?.pending_agent_submissions || 0);
+    Number(
+      data.overview
+        ?.high_risk_alerts ||
+        0
+    ) +
+    Number(
+      data.overview
+        ?.pending_emerging_reviews ||
+        0
+    ) +
+    Number(
+      data.overview
+        ?.pending_agent_submissions ||
+        0
+    );
 
+
+  /* ==========================================================
+     DISTRICT
+  ========================================================== */
 
   const districtName =
     data.overview
@@ -452,75 +374,50 @@ export default function MedicalSupervisorPortal({
     data.overview
       ?.district
       ?.name ||
-    data.monitoring
-      ?.district
-      ?.name ||
     "Kodagu District";
 
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
     <MedicalSupervisorLayout
-      activeTab={tab}
-      onTabChange={setTab}
-      onExit={onExit}
-      alertCount={alertCount}
-      districtName={districtName}
+      activeTab={
+        tab
+      }
+      onTabChange={
+        setTab
+      }
+      onExit={
+        onExit
+      }
+      alertCount={
+        alertCount
+      }
+      districtName={
+        districtName
+      }
     >
-
-      {/* =====================================================
+      {/* ======================================================
           ERROR
-      ===================================================== */}
+      ====================================================== */}
 
       {error && (
-        <div
-          className="
-            mb-5
-            flex
-            items-center
-            justify-between
-            gap-3
-            rounded-xl
-            border
-            border-[#F0CACA]
-            bg-[#FFF5F5]
-            px-4
-            py-3
-            text-[11px]
-            text-[#C62828]
-          "
-        >
-
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-[#F0CACA] bg-[#FFF5F5] px-4 py-3 text-[11px] text-[#C62828]">
           <div className="flex items-center gap-2">
-            <AlertCircle size={15} />
+            <AlertCircle
+              size={15}
+            />
 
             <span>
               {error}
             </span>
           </div>
 
-
           <button
             type="button"
-            onClick={refreshAll}
-            disabled={refreshing}
-            className="
-              inline-flex
-              items-center
-              gap-2
-              rounded-lg
-              border
-              border-[#F0CACA]
-              bg-white
-              px-3
-              py-2
-              font-semibold
-            "
+            onClick={() =>
+              load(true)
+            }
+            className="inline-flex items-center gap-2 rounded-lg border border-[#F0CACA] bg-white px-3 py-2 font-semibold"
           >
-
             <RefreshCw
               size={13}
               className={
@@ -531,41 +428,27 @@ export default function MedicalSupervisorPortal({
             />
 
             Retry
-
           </button>
-
         </div>
       )}
 
-
-      {/* =====================================================
+      {/* ======================================================
           GLOBAL REFRESH
-      ===================================================== */}
+      ====================================================== */}
 
-      {tab !== "home-relief" && (
+      {tab !==
+        "home-relief" && (
         <div className="mb-3 flex justify-end">
-
           <button
             type="button"
-            onClick={refreshAll}
-            disabled={refreshing}
-            className="
-              inline-flex
-              items-center
-              gap-2
-              rounded-lg
-              border
-              border-[#DDE5E0]
-              bg-white
-              px-3
-              py-2
-              text-[10px]
-              font-semibold
-              text-[#52627D]
-              hover:bg-[#F7FAF8]
-            "
+            onClick={() =>
+              load(true)
+            }
+            disabled={
+              refreshing
+            }
+            className="inline-flex items-center gap-2 rounded-lg border border-[#DDE5E0] bg-white px-3 py-2 text-[10px] font-semibold text-[#52627D] hover:bg-[#F7FAF8] disabled:opacity-50"
           >
-
             <RefreshCw
               size={13}
               className={
@@ -576,95 +459,116 @@ export default function MedicalSupervisorPortal({
             />
 
             Refresh
-
           </button>
-
         </div>
       )}
 
-
-      {/* =====================================================
-          PAGE CONTENT
-      ===================================================== */}
+      {/* ======================================================
+          CONTENT
+      ====================================================== */}
 
       {loading ? (
-
         <Loading />
-
-      ) : tab === "overview" ? (
-
+      ) : tab ===
+        "overview" ? (
         <Overview
-          data={data.overview}
+          data={
+            data.overview
+          }
           onReports={() =>
-            setTab("reports")
+            setTab(
+              "reports"
+            )
           }
           onMonitoring={() =>
-            setTab("monitoring")
+            setTab(
+              "monitoring"
+            )
           }
           onAlerts={() =>
-            setTab("alerts")
+            setTab(
+              "alerts"
+            )
           }
         />
-
-      ) : tab === "reports" ? (
-
+      ) : tab ===
+        "reports" ? (
         <DiseaseReports
-          reports={data.reports}
-          overview={data.overview}
-          agents={data.agents}
+          reports={
+            data.reports
+          }
+
+          emerging={
+            data.emerging
+          }
+
+          overview={
+            data.overview
+          }
+
+          agents={
+            data.agents
+          }
+
           onRefresh={() =>
-            load(true, monitoringWeek)
+            load(true)
           }
-          onCreateReport={
-            createMedicalReport
+
+          onReviewReport={
+            reviewMedicalReport
+          }
+
+          onReviewEmerging={
+            reviewEmerging
           }
         />
-
-      ) : tab === "monitoring" ? (
-
+      ) : tab ===
+        "monitoring" ? (
         <WeeklyMonitoring
-          monitoring={data.monitoring}
           rows={
-            data.monitoring?.rows || []
+            data.monitoring
           }
-          onRemind={remindAgent}
-          onRemindAll={
-            remindAllMonitoringAgents
+          onRemind={
+            remindAgent
           }
-          onRefresh={refreshAll}
-          onWeekChange={
-            changeMonitoringWeek
+          onRefresh={() =>
+            load(true)
           }
         />
-
-      ) : tab === "risk-map" ? (
-
+      ) : tab ===
+        "risk-map" ? (
         <RiskMap
-          data={data.riskMap}
+          data={
+            data.riskMap
+          }
         />
-
-      ) : tab === "analytics" ? (
-
+      ) : tab ===
+        "analytics" ? (
         <SurveillanceAnalytics
-          data={data.analytics}
+          data={
+            data.analytics
+          }
         />
-
-      ) : tab === "agents" ? (
-
+      ) : tab ===
+        "agents" ? (
         <AgentOversight
-          agents={data.agents}
-          issues={data.issues}
+          agents={
+            data.agents
+          }
+          issues={
+            data.issues
+          }
           onSubmitIssue={
             submitIssue
           }
         />
-
-      ) : tab === "alerts" ? (
-
+      ) : tab ===
+        "alerts" ? (
         <Alerts
           alerts={
             data.overview
-              ?.recent_alerts || []
+              ?.recent_alerts ||
+            []
           }
           emerging={
             data.emerging
@@ -673,16 +577,32 @@ export default function MedicalSupervisorPortal({
             data.diseases
           }
           onReviewEmerging={
-            reviewEmerging
+            async (
+              id,
+              decision,
+              notes,
+              extra
+            ) => {
+              await api.reviewEmergingDisease(
+                id,
+                {
+                  decision,
+                  review_notes:
+                    notes ||
+                    "",
+                  ...extra,
+                }
+              );
+
+              await load(
+                false
+              );
+            }
           }
         />
-
       ) : (
-
         <HomeReliefManagement />
-
       )}
-
     </MedicalSupervisorLayout>
   );
 }

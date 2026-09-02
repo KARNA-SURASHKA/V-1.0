@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   CalendarDays,
   Check,
@@ -13,18 +14,20 @@ import {
   FilePlus2,
   Loader2,
   MapPin,
-  MoreVertical,
   Search,
   X,
-  RotateCcw,
 } from "lucide-react";
 
-import { DISEASES } from "../../../api";
-import { RiskBadge, StatusBadge } from "./MedicalUi";
+import api, { DISEASES } from "../../../api";
 
-// ============================================================
-// DISEASE META
-// ============================================================
+import {
+  RiskBadge,
+  StatusBadge,
+} from "./MedicalUi";
+
+/* ============================================================
+   DISEASE META
+============================================================ */
 
 const DISEASE_META = {
   Dengue: {
@@ -53,11 +56,11 @@ const DISEASE_META = {
   },
 };
 
-// ============================================================
-// DATE HELPERS
-// ============================================================
+/* ============================================================
+   DATE HELPERS
+============================================================ */
 
-function formatDate(value) {
+const formatDate = (value) => {
   if (!value) return "—";
 
   const date = new Date(value);
@@ -71,9 +74,9 @@ function formatDate(value) {
     month: "short",
     year: "numeric",
   }).format(date);
-}
+};
 
-function formatTime(value) {
+const formatTime = (value) => {
   if (!value) return "";
 
   const date = new Date(value);
@@ -86,9 +89,9 @@ function formatTime(value) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
+};
 
-function toInputDate(date) {
+const toInputDate = (date) => {
   const d = new Date(date);
 
   const year = d.getFullYear();
@@ -102,46 +105,35 @@ function toInputDate(date) {
   ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
-}
+};
 
-function dateLabel(value) {
-  if (!value) return "All dates";
+const dateLabel = (value) => {
+  if (!value) return "—";
 
-  const date = new Date(
-    `${value}T00:00:00`
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(
+    new Date(`${value}T00:00:00`)
   );
+};
 
-  if (Number.isNaN(date.getTime())) {
-    return "All dates";
-  }
+/* ============================================================
+   STATUS / PRIORITY HELPERS
+============================================================ */
 
-  return new Intl.DateTimeFormat(
-    "en-IN",
-    {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }
-  ).format(date);
-}
-
-// ============================================================
-// STATUS / PRIORITY
-// ============================================================
-
-function normalizeStatus(value) {
+const normalizeStatus = (value) => {
   const status = String(
     value || "Pending Review"
   ).trim();
 
   return status || "Pending Review";
-}
+};
 
-function priorityFor(report) {
+const priorityFor = (report) => {
   if (report?.priority) {
-    return String(
-      report.priority
-    );
+    return report.priority;
   }
 
   const severity = String(
@@ -165,9 +157,9 @@ function priorityFor(report) {
   }
 
   return "Low";
-}
+};
 
-function statusTone(status) {
+const statusTone = (status) => {
   if (status === "Approved") {
     return "green";
   }
@@ -177,11 +169,11 @@ function statusTone(status) {
   }
 
   return "blue";
-}
+};
 
-// ============================================================
-// DISEASE ICON
-// ============================================================
+/* ============================================================
+   DISEASE ICON
+============================================================ */
 
 function DiseaseIcon({ disease }) {
   const meta =
@@ -193,37 +185,44 @@ function DiseaseIcon({ disease }) {
 
   return (
     <span
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${meta.iconClass}`}
+      className={`
+        flex h-8 w-8 shrink-0
+        items-center justify-center
+        rounded-full
+        text-[14px]
+        font-semibold
+        ${meta.iconClass}
+      `}
     >
       {meta.icon}
     </span>
   );
 }
 
-// ============================================================
-// SELECT FIELD
-// ============================================================
+/* ============================================================
+   SELECT FIELD
+============================================================ */
 
 function SelectField({
   value,
   onChange,
   children,
+  className = "",
 }) {
   return (
-    <div className="relative">
+    <div
+      className={`relative ${className}`}
+    >
       <select
         value={value}
         onChange={onChange}
         className="
-          h-11
-          w-full
+          h-11 w-full
           appearance-none
           rounded-xl
-          border
-          border-[#E1E7E3]
+          border border-[#E1E7E3]
           bg-white
-          px-3.5
-          pr-9
+          px-3.5 pr-9
           text-[11px]
           font-medium
           text-[#26334A]
@@ -241,8 +240,7 @@ function SelectField({
         size={15}
         className="
           pointer-events-none
-          absolute
-          right-3
+          absolute right-3
           top-1/2
           -translate-y-1/2
           text-[#6E7B8D]
@@ -252,9 +250,9 @@ function SelectField({
   );
 }
 
-// ============================================================
-// SUMMARY CARD
-// ============================================================
+/* ============================================================
+   SUMMARY CARD
+============================================================ */
 
 function SummaryCard({ summary }) {
   const risk = summary.risk;
@@ -271,8 +269,7 @@ function SummaryCard({ summary }) {
     summary.change || 0
   );
 
-  const changePositive =
-    change > 0;
+  const changePositive = change > 0;
 
   return (
     <div
@@ -283,8 +280,7 @@ function SummaryCard({ summary }) {
         border-[#E4EAE7]
         border-l-[3px]
         bg-white
-        px-5
-        py-4
+        px-5 py-4
         shadow-[0_4px_16px_rgba(24,54,42,.035)]
         ${riskClass}
       `}
@@ -306,9 +302,7 @@ function SummaryCard({ summary }) {
           <div
             className="
               mt-1
-              flex
-              items-center
-              gap-1.5
+              flex items-center gap-1.5
               text-[10px]
               text-[#5D697B]
             "
@@ -340,8 +334,7 @@ function SummaryCard({ summary }) {
       <div
         className="
           mt-4
-          grid
-          grid-cols-3
+          grid grid-cols-3
           items-end
           gap-3
         "
@@ -428,298 +421,968 @@ function SummaryCard({ summary }) {
   );
 }
 
-// ============================================================
-// REPORT DETAILS MODAL
-// ============================================================
+/* ============================================================
+   REVIEW DRAWER
+============================================================ */
 
-function ReportDetails({
+function ReportReviewDrawer({
   report,
   onClose,
+  onReview,
+  reviewing = false,
+  reviewError = "",
 }) {
   if (!report) {
     return null;
   }
 
-  const priority =
-    priorityFor(report);
+  const reportId =
+    report.report_id ||
+    `RPT-${String(report.id).padStart(
+      4,
+      "0"
+    )}`;
 
-  const status =
-    normalizeStatus(report.status);
+  const status = normalizeStatus(
+    report.status
+  );
+
+  const priority = priorityFor(
+    report
+  );
+
+  const handleDecision = async (
+    decision
+  ) => {
+    await onReview(
+      report,
+      decision
+    );
+  };
 
   return (
-    <div
-      className="
-        fixed
-        inset-0
-        z-[90]
-        flex
-        items-center
-        justify-center
-        bg-[#102A43]/25
-        p-4
-        backdrop-blur-[1px]
-      "
-      onMouseDown={onClose}
-    >
+    <>
+      {/* ======================================================
+         BACKDROP
+      ====================================================== */}
+
       <div
         className="
-          max-h-[88vh]
+          fixed inset-0
+          z-[80]
+          bg-[#102A43]/10
+          backdrop-blur-[1px]
+        "
+        onMouseDown={onClose}
+      />
+
+      {/* ======================================================
+         DRAWER
+      ====================================================== */}
+
+      <aside
+        className="
+          fixed
+          right-0
+          top-0
+          z-[90]
+          flex
+          h-screen
           w-full
-          max-w-[680px]
-          overflow-y-auto
-          rounded-2xl
-          border
-          border-[#E1E7E3]
+          max-w-[410px]
+          flex-col
+          border-l
+          border-[#E3E9E5]
           bg-white
-          shadow-[0_25px_80px_rgba(16,42,67,.22)]
+          shadow-[-14px_0_45px_rgba(16,42,67,.12)]
         "
         onMouseDown={(event) =>
           event.stopPropagation()
         }
       >
+        {/* ====================================================
+           HEADER
+        ==================================================== */}
+
         <div
           className="
             flex
+            shrink-0
             items-start
             justify-between
             border-b
-            border-[#E8EDEB]
+            border-[#E7ECE9]
+            bg-white
             px-6
             py-5
           "
         >
-          <div>
+          <div className="min-w-0">
             <div
               className="
-                text-[10px]
-                font-bold
+                text-[9px]
+                font-semibold
                 uppercase
-                tracking-[.12em]
+                tracking-[.13em]
                 text-[#087A32]
               "
             >
-              Disease Report
+              Disease Report Review
             </div>
 
             <h2
               className="
-                mt-1
-                text-[21px]
+                mt-1.5
+                text-[20px]
                 font-semibold
+                leading-tight
                 tracking-[-.025em]
-                text-[#101B38]
+                text-[#17233D]
               "
             >
-              {report.report_id ||
-                `RPT-${String(
-                  report.id
-                ).padStart(4, "0")}`}
+              Reviewing Disease
             </h2>
+
+            <div
+              className="
+                mt-1.5
+                text-[10px]
+                font-medium
+                text-[#7A8795]
+              "
+            >
+              Report ID{" "}
+              <span
+                className="
+                  font-semibold
+                  text-[#52627D]
+                "
+              >
+                {reportId}
+              </span>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
+            disabled={reviewing}
             className="
+              ml-3
               flex
-              h-9
-              w-9
+              h-8
+              w-8
+              shrink-0
               items-center
               justify-center
-              rounded-xl
-              text-[#66727D]
-              hover:bg-[#F5F8F6]
+              rounded-lg
+              text-[#718096]
+              transition
+              hover:bg-[#F4F7F5]
+              hover:text-[#26334A]
+              disabled:cursor-not-allowed
+              disabled:opacity-40
             "
+            aria-label="Close review"
           >
-            <X size={18} />
+            <X
+              size={18}
+              strokeWidth={1.7}
+            />
           </button>
         </div>
 
+        {/* ====================================================
+           SCROLLABLE BODY
+        ==================================================== */}
+
         <div
           className="
-            grid
-            gap-3
-            px-6
-            py-5
-            sm:grid-cols-2
+            min-h-0
+            flex-1
+            overflow-y-auto
           "
         >
-          {[
-            [
-              "Disease",
-              report.disease,
-            ],
-            [
-              "Taluk",
-              report.taluk_name,
-            ],
-            [
-              "Agent",
-              report.agent_name,
-            ],
-            [
-              "Cases",
-              report.cases ?? 0,
-            ],
-            [
-              "Submitted",
-              `${formatDate(
-                report.created_at
-              )} · ${formatTime(
-                report.created_at
-              )}`,
-            ],
-            [
-              "Week",
-              report.week_number ??
-                "—",
-            ],
-          ].map(
-            ([label, value]) => (
+          <div
+            className="
+              space-y-5
+              px-6
+              py-5
+            "
+          >
+            {/* ==================================================
+               REVIEW NOTICE
+            ================================================== */}
+
+            <div
+              className="
+                flex
+                items-center
+                gap-2.5
+                rounded-xl
+                border
+                border-[#D8EBDD]
+                bg-[#EFF9F1]
+                px-3.5
+                py-3
+              "
+            >
               <div
-                key={label}
                 className="
+                  flex
+                  h-7
+                  w-7
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-white
+                  text-[#087A32]
+                  shadow-sm
+                "
+              >
+                <Check
+                  size={14}
+                  strokeWidth={2}
+                />
+              </div>
+
+              <div
+                className="
+                  text-[10px]
+                  font-semibold
+                  leading-4
+                  text-[#287544]
+                "
+              >
+                You are reviewing a normal
+                disease report
+              </div>
+            </div>
+
+            {/* ==================================================
+               REPORT OVERVIEW
+            ================================================== */}
+
+            <section>
+              <div
+                className="
+                  mb-2.5
+                  text-[11px]
+                  font-semibold
+                  tracking-[-.01em]
+                  text-[#26334A]
+                "
+              >
+                Report Overview
+              </div>
+
+              <div
+                className="
+                  overflow-hidden
                   rounded-xl
                   border
-                  border-[#E7ECE9]
-                  bg-[#F8FAF9]
-                  p-3.5
+                  border-[#E1E7E3]
+                  bg-white
+                "
+              >
+                {/* Report ID */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Report ID
+                  </span>
+
+                  <span
+                    className="
+                      text-[10px]
+                      font-semibold
+                      text-[#344054]
+                    "
+                  >
+                    {reportId}
+                  </span>
+                </div>
+
+                {/* Disease */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Disease
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <DiseaseIcon
+                      disease={
+                        report.disease
+                      }
+                    />
+
+                    <span
+                      className="
+                        text-[10px]
+                        font-semibold
+                        text-[#344054]
+                      "
+                    >
+                      {report.disease ||
+                        "Not provided"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Taluk */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Taluk
+                  </span>
+
+                  <span
+                    className="
+                      text-[10px]
+                      font-semibold
+                      text-[#344054]
+                    "
+                  >
+                    {report.taluk_name ||
+                      "Not provided"}
+                  </span>
+                </div>
+
+                {/* Submitted By */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Submitted By
+                  </span>
+
+                  <div>
+                    <div
+                      className="
+                        text-[10px]
+                        font-semibold
+                        text-[#344054]
+                      "
+                    >
+                      {report.agent_name ||
+                        "Not provided"}
+                    </div>
+
+                    {report.district_name && (
+                      <div
+                        className="
+                          mt-0.5
+                          text-[9px]
+                          text-[#8A94A3]
+                        "
+                      >
+                        {report.district_name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submitted On */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Submitted On
+                  </span>
+
+                  <div>
+                    <div
+                      className="
+                        text-[10px]
+                        font-semibold
+                        text-[#344054]
+                      "
+                    >
+                      {formatDate(
+                        report.created_at
+                      )}
+                    </div>
+
+                    <div
+                      className="
+                        mt-0.5
+                        text-[9px]
+                        text-[#8A94A3]
+                      "
+                    >
+                      {formatTime(
+                        report.created_at
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Status
+                  </span>
+
+                  <div>
+                    <StatusBadge
+                      tone={statusTone(
+                        status
+                      )}
+                    >
+                      {status}
+                    </StatusBadge>
+                  </div>
+                </div>
+
+                {/* Risk */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Risk Level
+                  </span>
+
+                  <div>
+                    <RiskBadge
+                      level={
+                        priority === "Medium"
+                          ? "Moderate"
+                          : priority
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* ==================================================
+               AGENT SUBMITTED DETAILS
+            ================================================== */}
+
+            <section>
+              <div
+                className="
+                  mb-2.5
+                  text-[11px]
+                  font-semibold
+                  tracking-[-.01em]
+                  text-[#26334A]
+                "
+              >
+                Agent Submitted Details
+              </div>
+
+              <div
+                className="
+                  overflow-hidden
+                  rounded-xl
+                  border
+                  border-[#E1E7E3]
+                  bg-white
+                "
+              >
+                {/* Cases */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Cases Observed
+                  </span>
+
+                  <span
+                    className="
+                      text-[10px]
+                      font-semibold
+                      text-[#344054]
+                    "
+                  >
+                    {Number(
+                      report.cases || 0
+                    )}
+                  </span>
+                </div>
+
+                {/* Symptoms */}
+
+                <div
+                  className="
+                    grid
+                    grid-cols-[110px_1fr]
+                    items-center
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3
+                  "
+                >
+                  <span
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Symptoms Observed
+                  </span>
+
+                  <span
+                    className="
+                      text-[10px]
+                      font-medium
+                      leading-4
+                      text-[#52627D]
+                    "
+                  >
+                    {report.symptoms ||
+                      "Not provided by agent"}
+                  </span>
+                </div>
+
+                {/* Remarks */}
+
+                <div
+                  className="
+                    border-b
+                    border-[#EDF0EE]
+                    px-3.5
+                    py-3.5
+                  "
+                >
+                  <div
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Remarks
+                  </div>
+
+                  <div
+                    className="
+                      mt-1.5
+                      rounded-lg
+                      bg-[#F8FAF9]
+                      px-3
+                      py-2.5
+                      text-[10px]
+                      leading-5
+                      text-[#52627D]
+                    "
+                  >
+                    {report.remarks ||
+                      "No remarks were provided by the agent."}
+                  </div>
+                </div>
+
+                {/* Preventive Measures */}
+
+                <div
+                  className="
+                    px-3.5
+                    py-3.5
+                  "
+                >
+                  <div
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#718096]
+                    "
+                  >
+                    Preventive Measures
+                  </div>
+
+                  <div
+                    className="
+                      mt-1.5
+                      rounded-lg
+                      bg-[#F8FAF9]
+                      px-3
+                      py-2.5
+                      text-[10px]
+                      leading-5
+                      text-[#52627D]
+                    "
+                  >
+                    {report.preventive_measures ||
+                      "No preventive measures were provided."}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* ==================================================
+               REPORTING INFORMATION
+            ================================================== */}
+
+            <section>
+              <div
+                className="
+                  mb-2.5
+                  text-[11px]
+                  font-semibold
+                  tracking-[-.01em]
+                  text-[#26334A]
+                "
+              >
+                Reporting Information
+              </div>
+
+              <div
+                className="
+                  grid
+                  grid-cols-2
+                  gap-3
                 "
               >
                 <div
                   className="
-                    text-[9px]
-                    font-bold
-                    uppercase
-                    tracking-[.09em]
-                    text-[#8A94A3]
+                    rounded-xl
+                    border
+                    border-[#E1E7E3]
+                    bg-[#FAFBFA]
+                    px-3.5
+                    py-3
                   "
                 >
-                  {label}
+                  <div
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#8A94A3]
+                    "
+                  >
+                    Reporting Week
+                  </div>
+
+                  <div
+                    className="
+                      mt-1
+                      text-[10px]
+                      font-semibold
+                      text-[#344054]
+                    "
+                  >
+                    {report.week_number ||
+                      "Not provided"}
+                  </div>
                 </div>
 
                 <div
                   className="
-                    mt-1
-                    text-[12px]
-                    font-semibold
-                    text-[#26334A]
+                    rounded-xl
+                    border
+                    border-[#E1E7E3]
+                    bg-[#FAFBFA]
+                    px-3.5
+                    py-3
                   "
                 >
-                  {value || "—"}
+                  <div
+                    className="
+                      text-[9px]
+                      font-medium
+                      text-[#8A94A3]
+                    "
+                  >
+                    Reporting Year
+                  </div>
+
+                  <div
+                    className="
+                      mt-1
+                      text-[10px]
+                      font-semibold
+                      text-[#344054]
+                    "
+                  >
+                    {report.year ||
+                      "Not provided"}
+                  </div>
                 </div>
               </div>
-            )
-          )}
+            </section>
+
+            {/* ==================================================
+               REVIEW ERROR
+            ================================================== */}
+
+            {reviewError && (
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-[#F2CACA]
+                  bg-[#FFF5F5]
+                  px-3.5
+                  py-3
+                  text-[10px]
+                  leading-4
+                  text-[#B42318]
+                "
+              >
+                {reviewError}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-4 px-6 pb-6">
+        {/* ====================================================
+           REVIEW ACTION FOOTER
+        ==================================================== */}
+
+        <div
+          className="
+            shrink-0
+            border-t
+            border-[#E5EAE7]
+            bg-white
+            px-6
+            py-4
+          "
+        >
           <div
             className="
-              flex
-              items-center
-              justify-between
-              rounded-xl
-              border
-              border-[#E7ECE9]
-              px-4
-              py-3
+              mb-2.5
+              text-[10px]
+              font-semibold
+              text-[#344054]
             "
           >
-            <span
-              className="
-                text-[11px]
-                font-semibold
-                text-[#52627D]
-              "
-            >
-              Status
-            </span>
-
-            <div className="flex items-center gap-2">
-              <StatusBadge
-                tone={statusTone(status)}
-              >
-                {status}
-              </StatusBadge>
-
-              <RiskBadge
-                level={
-                  priority ===
-                  "Medium"
-                    ? "Moderate"
-                    : priority
-                }
-              />
-            </div>
+            Review Action
           </div>
 
-          <div>
-            <div
-              className="
-                text-[11px]
-                font-semibold
-                text-[#26334A]
-              "
-            >
-              Remarks
-            </div>
+          <div
+            className="
+              grid
+              grid-cols-3
+              gap-2
+            "
+          >
+            {/* Reject */}
 
-            <p
+            <button
+              type="button"
+              disabled={reviewing}
+              onClick={() =>
+                handleDecision(
+                  "REJECT"
+                )
+              }
               className="
-                mt-2
+                h-10
                 rounded-xl
                 border
-                border-[#E7ECE9]
+                border-[#F1CACA]
                 bg-white
-                p-3.5
-                text-[11px]
-                leading-5
-                text-[#66727D]
-              "
-            >
-              {report.remarks ||
-                "No remarks were submitted with this report."}
-            </p>
-          </div>
-
-          <div>
-            <div
-              className="
-                text-[11px]
+                text-[10px]
                 font-semibold
-                text-[#26334A]
+                text-[#D94A4A]
+                transition
+                hover:bg-[#FFF6F6]
+                disabled:cursor-not-allowed
+                disabled:opacity-50
               "
             >
-              Preventive measures
-            </div>
+              {reviewing
+                ? "..."
+                : "Reject"}
+            </button>
 
-            <p
+            {/* Keep Pending */}
+
+            <button
+              type="button"
+              disabled={reviewing}
+              onClick={() =>
+                handleDecision(
+                  "KEEP_PENDING"
+                )
+              }
               className="
-                mt-2
+                h-10
                 rounded-xl
                 border
-                border-[#E7ECE9]
+                border-[#EBD8AF]
                 bg-white
-                p-3.5
-                text-[11px]
-                leading-5
-                text-[#66727D]
+                text-[10px]
+                font-semibold
+                text-[#C58A22]
+                transition
+                hover:bg-[#FFFAF0]
+                disabled:cursor-not-allowed
+                disabled:opacity-50
               "
             >
-              {report.preventive_measures ||
-                "No preventive measures were recorded."}
-            </p>
+              {reviewing
+                ? "..."
+                : "Keep Pending"}
+            </button>
+
+            {/* Approve */}
+
+            <button
+              type="button"
+              disabled={reviewing}
+              onClick={() =>
+                handleDecision(
+                  "APPROVE"
+                )
+              }
+              className="
+                h-10
+                rounded-xl
+                bg-[#087A32]
+                text-[10px]
+                font-semibold
+                text-white
+                shadow-[0_5px_14px_rgba(8,122,50,.16)]
+                transition
+                hover:bg-[#066728]
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
+            >
+              {reviewing
+                ? "..."
+                : "Approve"}
+            </button>
           </div>
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 }
 
-// ============================================================
-// NEW REPORT MODAL
-// ============================================================
+/* ============================================================
+   NEW REPORT MODAL
+============================================================ */
 
 function NewReportModal({
   agents,
@@ -727,39 +1390,38 @@ function NewReportModal({
   onCreate,
   saving,
 }) {
-  const [form, setForm] =
-    useState({
-      agent_id:
-        agents?.[0]?.id
-          ? String(
-              agents[0].id
-            )
-          : "",
+  const [form, setForm] = useState({
+    agent_id:
+      agents?.[0]?.id
+        ? String(agents[0].id)
+        : "",
 
-      disease:
-        DISEASES?.[0] ||
-        "Dengue",
+    disease:
+      DISEASES[0],
 
-      cases: "0",
+    cases: "0",
 
-      severity: "Low",
+    severity: "Low",
 
-      remarks: "",
+    remarks: "",
 
-      preventive_measures: "",
-    });
+    preventive_measures: "",
+  });
 
   useEffect(() => {
     if (
       !form.agent_id &&
       agents?.[0]?.id
     ) {
-      setForm((current) => ({
-        ...current,
-        agent_id: String(
-          agents[0].id
-        ),
-      }));
+      setForm(
+        (current) => ({
+          ...current,
+
+          agent_id: String(
+            agents[0].id
+          ),
+        })
+      );
     }
   }, [
     agents,
@@ -770,15 +1432,17 @@ function NewReportModal({
     key,
     value
   ) => {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setForm(
+      (current) => ({
+        ...current,
+        [key]: value,
+      })
+    );
   };
 
-  async function submit(
+  const submit = async (
     event
-  ) {
+  ) => {
     event.preventDefault();
 
     if (
@@ -790,9 +1454,11 @@ function NewReportModal({
 
     await onCreate({
       ...form,
+
       agent_id: Number(
         form.agent_id
       ),
+
       cases: Math.max(
         0,
         Number(
@@ -800,13 +1466,12 @@ function NewReportModal({
         )
       ),
     });
-  }
+  };
 
   return (
     <div
       className="
-        fixed
-        inset-0
+        fixed inset-0
         z-[90]
         flex
         items-center
@@ -832,6 +1497,8 @@ function NewReportModal({
           shadow-[0_25px_80px_rgba(16,42,67,.22)]
         "
       >
+        {/* Header */}
+
         <div
           className="
             flex
@@ -898,6 +1565,8 @@ function NewReportModal({
           </button>
         </div>
 
+        {/* Form */}
+
         <div
           className="
             grid
@@ -907,6 +1576,8 @@ function NewReportModal({
             sm:grid-cols-2
           "
         >
+          {/* Agent */}
+
           <label className="sm:col-span-2">
             <span
               className="
@@ -921,7 +1592,9 @@ function NewReportModal({
             </span>
 
             <SelectField
-              value={form.agent_id}
+              value={
+                form.agent_id
+              }
               onChange={(event) =>
                 update(
                   "agent_id",
@@ -942,8 +1615,7 @@ function NewReportModal({
                     value={agent.id}
                   >
                     {agent.name ||
-                      agent.full_name ||
-                      "Agent"}{" "}
+                      agent.full_name}{" "}
                     ·{" "}
                     {agent.taluk_name ||
                       "Assigned taluk"}
@@ -952,6 +1624,8 @@ function NewReportModal({
               )}
             </SelectField>
           </label>
+
+          {/* Disease */}
 
           <label>
             <span
@@ -967,7 +1641,9 @@ function NewReportModal({
             </span>
 
             <SelectField
-              value={form.disease}
+              value={
+                form.disease
+              }
               onChange={(event) =>
                 update(
                   "disease",
@@ -975,7 +1651,7 @@ function NewReportModal({
                 )
               }
             >
-              {(DISEASES || []).map(
+              {DISEASES.map(
                 (item) => (
                   <option
                     key={item}
@@ -986,6 +1662,8 @@ function NewReportModal({
               )}
             </SelectField>
           </label>
+
+          {/* Cases */}
 
           <label>
             <span
@@ -1003,7 +1681,9 @@ function NewReportModal({
             <input
               type="number"
               min="0"
-              value={form.cases}
+              value={
+                form.cases
+              }
               onChange={(event) =>
                 update(
                   "cases",
@@ -1026,6 +1706,8 @@ function NewReportModal({
             />
           </label>
 
+          {/* Priority */}
+
           <label>
             <span
               className="
@@ -1040,7 +1722,9 @@ function NewReportModal({
             </span>
 
             <SelectField
-              value={form.severity}
+              value={
+                form.severity
+              }
               onChange={(event) =>
                 update(
                   "severity",
@@ -1066,6 +1750,8 @@ function NewReportModal({
             </SelectField>
           </label>
 
+          {/* Scope */}
+
           <div
             className="
               rounded-xl
@@ -1089,6 +1775,8 @@ function NewReportModal({
             </div>
           </div>
 
+          {/* Remarks */}
+
           <label className="sm:col-span-2">
             <span
               className="
@@ -1103,7 +1791,9 @@ function NewReportModal({
             </span>
 
             <textarea
-              value={form.remarks}
+              value={
+                form.remarks
+              }
               onChange={(event) =>
                 update(
                   "remarks",
@@ -1128,6 +1818,8 @@ function NewReportModal({
               "
             />
           </label>
+
+          {/* Preventive Measures */}
 
           <label className="sm:col-span-2">
             <span
@@ -1171,6 +1863,8 @@ function NewReportModal({
             />
           </label>
         </div>
+
+        {/* Footer */}
 
         <div
           className="
@@ -1240,9 +1934,9 @@ function NewReportModal({
   );
 }
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
+/* ============================================================
+   MAIN DISEASE REPORTS COMPONENT
+============================================================ */
 
 export default function DiseaseReports({
   reports = [],
@@ -1251,6 +1945,10 @@ export default function DiseaseReports({
   onRefresh,
   onCreateReport,
 }) {
+  /* ==========================================================
+     STATE
+  ========================================================== */
+
   const [search, setSearch] =
     useState("");
 
@@ -1263,19 +1961,11 @@ export default function DiseaseReports({
   const [taluk, setTaluk] =
     useState("All Taluks");
 
-  // IMPORTANT:
-  // Do NOT initialize this to:
-  //
-  //   current month -> yesterday
-  //
-  // because on September 1 that becomes:
-  //
-  //   Sep 1 -> Aug 31
-  //
-  // which hides every report.
-  //
-  // Start with ALL dates.
-
+  /*
+   * Start with ALL dates.
+   * This matches the requirement that the page
+   * should initially show all available reports.
+   */
   const [startDate, setStartDate] =
     useState("");
 
@@ -1288,36 +1978,36 @@ export default function DiseaseReports({
   const [selected, setSelected] =
     useState(null);
 
-  const [menuId, setMenuId] =
-    useState(null);
+  const [reviewing, setReviewing] =
+    useState(false);
+
+  const [reviewError, setReviewError] =
+    useState("");
 
   const [page, setPage] =
     useState(1);
 
-  const [
-    newReportOpen,
-    setNewReportOpen,
-  ] = useState(false);
+  const [newReportOpen, setNewReportOpen] =
+    useState(false);
 
   const [saving, setSaving] =
     useState(false);
 
   const perPage = 6;
 
-  // ==========================================================
-  // DISTRICT
-  // ==========================================================
+  /* ==========================================================
+     DISTRICT
+  ========================================================== */
 
   const districtName =
-    overview
-      ?.supervisor_district
+    overview?.supervisor_district
       ?.name ||
     overview?.district?.name ||
     "Kodagu";
 
-  // ==========================================================
-  // TALUKS
-  // ==========================================================
+  /* ==========================================================
+     TALUKS
+  ========================================================== */
 
   const locations =
     overview?.locations || [];
@@ -1350,9 +2040,9 @@ export default function DiseaseReports({
     reports,
   ]);
 
-  // ==========================================================
-  // SUMMARY CARDS
-  // ==========================================================
+  /* ==========================================================
+     SUMMARY CARDS
+  ========================================================== */
 
   const summaryCards = useMemo(() => {
     const currentWeek =
@@ -1369,252 +2059,241 @@ export default function DiseaseReports({
 
     return taluks
       .slice(0, 3)
-      .map((talukName) => {
-        const currentRows =
-          reports.filter(
-            (report) =>
-              report.taluk_name ===
-                talukName &&
-              (
-                !currentWeek ||
-                Number(
-                  report.week_number
-                ) === currentWeek
-              )
-          );
-
-        const previousRows =
-          reports.filter(
-            (report) =>
-              report.taluk_name ===
-                talukName &&
-              (
-                !previousWeek ||
-                Number(
-                  report.week_number
-                ) === previousWeek
-              )
-          );
-
-        const currentCases =
-          currentRows.reduce(
-            (sum, row) =>
-              sum +
-              Number(
-                row.cases || 0
-              ),
-            0
-          );
-
-        const previousCases =
-          previousRows.reduce(
-            (sum, row) =>
-              sum +
-              Number(
-                row.cases || 0
-              ),
-            0
-          );
-
-        const change =
-          previousCases
-            ? Math.round(
+      .map(
+        (talukName) => {
+          const currentRows =
+            reports.filter(
+              (report) =>
+                report.taluk_name ===
+                  talukName &&
                 (
+                  !currentWeek ||
+                  Number(
+                    report.week_number
+                  ) === currentWeek
+                )
+            );
+
+          const previousRows =
+            reports.filter(
+              (report) =>
+                report.taluk_name ===
+                  talukName &&
+                (
+                  !previousWeek ||
+                  Number(
+                    report.week_number
+                  ) === previousWeek
+                )
+            );
+
+          const currentCases =
+            currentRows.reduce(
+              (
+                total,
+                row
+              ) =>
+                total +
+                Number(
+                  row.cases || 0
+                ),
+              0
+            );
+
+          const previousCases =
+            previousRows.reduce(
+              (
+                total,
+                row
+              ) =>
+                total +
+                Number(
+                  row.cases || 0
+                ),
+              0
+            );
+
+          const change =
+            previousCases
+              ? Math.round(
                   (
-                    currentCases -
+                    (
+                      currentCases -
+                      previousCases
+                    ) /
                     previousCases
-                  ) /
-                  previousCases
-                ) *
-                  100
+                  ) * 100
+                )
+              : currentCases
+                ? 100
+                : 0;
+
+          const highestRisk =
+            [...currentRows]
+              .map(
+                (row) =>
+                  priorityFor(row)
               )
-            : currentCases
-              ? 100
-              : 0;
+              .sort(
+                (
+                  a,
+                  b
+                ) => {
+                  const rank = {
+                    Low: 1,
+                    Medium: 2,
+                    Moderate: 2,
+                    High: 3,
+                    Critical: 4,
+                  };
 
-        const highestRisk =
-          [
-            ...currentRows,
-          ]
-            .map(
-              (row) =>
-                priorityFor(row)
-            )
-            .sort(
-              (a, b) => {
-                const rank = {
-                  Low: 1,
-                  Medium: 2,
-                  Moderate: 2,
-                  High: 3,
-                  Critical: 4,
-                };
+                  return (
+                    (
+                      rank[b] ||
+                      0
+                    ) -
+                    (
+                      rank[a] ||
+                      0
+                    )
+                  );
+                }
+              )[0];
 
-                return (
-                  (rank[b] || 0) -
-                  (rank[a] || 0)
-                );
-              }
-            )[0];
+          const agent =
+            currentRows[0]
+              ?.agent_name ||
+            reports.find(
+              (report) =>
+                report.taluk_name ===
+                talukName
+            )?.agent_name ||
+            "—";
 
-        const agent =
-          currentRows[0]
-            ?.agent_name ||
-          reports.find(
-            (row) =>
-              row.taluk_name ===
-              talukName
-          )?.agent_name ||
-          "—";
+          return {
+            taluk: talukName,
 
-        return {
-          taluk: talukName,
-          agent,
-          cases: currentCases,
-          reports:
-            currentRows.length,
-          change,
-          risk:
-            highestRisk === "Medium"
-              ? "Moderate"
-              : highestRisk ||
-                "Low",
-        };
-      });
+            agent,
+
+            cases:
+              currentCases,
+
+            reports:
+              currentRows.length,
+
+            change,
+
+            risk:
+              highestRisk ===
+              "Medium"
+                ? "Moderate"
+                : highestRisk ||
+                  "Low",
+          };
+        }
+      );
   }, [
     overview,
     reports,
     taluks,
   ]);
 
-  // ==========================================================
-  // FILTER REPORTS
-  // ==========================================================
+  /* ==========================================================
+     FILTERED REPORTS
+  ========================================================== */
 
-  const filtered =
-    useMemo(() => {
-      const query =
-        search
-          .trim()
+  const filtered = useMemo(() => {
+    const query =
+      search
+        .trim()
+        .toLowerCase();
+
+    const start =
+      startDate
+        ? new Date(
+            `${startDate}T00:00:00`
+          )
+        : null;
+
+    const end =
+      endDate
+        ? new Date(
+            `${endDate}T23:59:59.999`
+          )
+        : null;
+
+    return reports.filter(
+      (report) => {
+        const text = [
+          report.report_id,
+          report.id,
+          report.agent_name,
+          report.disease,
+          report.taluk_name,
+          report.status,
+        ]
+          .join(" ")
           .toLowerCase();
 
-      let start = null;
-      let end = null;
+        const reportDate =
+          report.created_at
+            ? new Date(
+                report.created_at
+              )
+            : null;
 
-      if (startDate) {
-        start = new Date(
-          `${startDate}T00:00:00`
-        );
-      }
+        const dateOk =
+          (!start ||
+            !reportDate ||
+            reportDate >= start) &&
+          (!end ||
+            !reportDate ||
+            reportDate <= end);
 
-      if (endDate) {
-        end = new Date(
-          `${endDate}T23:59:59.999`
-        );
-      }
+        const statusOk =
+          status ===
+            "All Status" ||
+          normalizeStatus(
+            report.status
+          ).toLowerCase() ===
+            status.toLowerCase();
 
-      // ------------------------------------------------------
-      // Safety:
-      // if user accidentally chooses an invalid range,
-      // don't silently show an empty table.
-      // ------------------------------------------------------
+        return (
+          (!query ||
+            text.includes(query)) &&
 
-      const invalidRange =
-        start &&
-        end &&
-        start > end;
-
-      return reports.filter(
-        (report) => {
-          const text = [
-            report.report_id,
-            report.id,
-            report.agent_name,
-            report.disease,
-            report.taluk_name,
-            report.status,
-            report.priority,
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          const reportDate =
-            report.created_at
-              ? new Date(
-                  report.created_at
-                )
-              : null;
-
-          const validReportDate =
-            reportDate &&
-            !Number.isNaN(
-              reportDate.getTime()
-            );
-
-          let dateOk = true;
-
-          if (
-            !invalidRange &&
-            validReportDate
-          ) {
-            if (
-              start &&
-              reportDate < start
-            ) {
-              dateOk = false;
-            }
-
-            if (
-              end &&
-              reportDate > end
-            ) {
-              dateOk = false;
-            }
-          }
-
-          const statusOk =
-            status ===
-              "All Status" ||
-            normalizeStatus(
-              report.status
-            ).toLowerCase() ===
-              status.toLowerCase();
-
-          const diseaseOk =
+          (
             disease ===
               "All Diseases" ||
             report.disease ===
-              disease;
+              disease
+          ) &&
 
-          const talukOk =
+          (
             taluk ===
               "All Taluks" ||
             report.taluk_name ===
-              taluk;
+              taluk
+          ) &&
 
-          return (
-            (!query ||
-              text.includes(query)) &&
-            diseaseOk &&
-            talukOk &&
-            statusOk &&
-            dateOk
-          );
-        }
-      );
-    }, [
-      reports,
-      search,
-      status,
-      disease,
-      taluk,
-      startDate,
-      endDate,
-    ]);
+          statusOk &&
+          dateOk
+        );
+      }
+    );
+  }, [
+    reports,
+    search,
+    status,
+    disease,
+    taluk,
+    startDate,
+    endDate,
+  ]);
 
-  // ==========================================================
-  // RESET PAGINATION
-  // ==========================================================
+  /* ==========================================================
+     RESET PAGE WHEN FILTERS CHANGE
+  ========================================================== */
 
   useEffect(() => {
     setPage(1);
@@ -1627,31 +2306,9 @@ export default function DiseaseReports({
     endDate,
   ]);
 
-  // ==========================================================
-  // CLOSE ACTION MENU
-  // ==========================================================
-
-  useEffect(() => {
-    const close = () => {
-      setMenuId(null);
-    };
-
-    document.addEventListener(
-      "mousedown",
-      close
-    );
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        close
-      );
-    };
-  }, []);
-
-  // ==========================================================
-  // PAGINATION
-  // ==========================================================
+  /* ==========================================================
+     PAGINATION
+  ========================================================== */
 
   const pageCount =
     Math.max(
@@ -1672,73 +2329,25 @@ export default function DiseaseReports({
     filtered.slice(
       (safePage - 1) *
         perPage,
-      safePage * perPage
+      safePage *
+        perPage
     );
 
-  const showingStart =
-    filtered.length
-      ? (safePage - 1) *
-          perPage +
-        1
-      : 0;
+  /* ==========================================================
+     EXPORT CSV
+  ========================================================== */
 
-  const showingEnd =
-    Math.min(
-      safePage * perPage,
-      filtered.length
-    );
-
-  // ==========================================================
-  // AGENT COUNT
-  // ==========================================================
-
-  const districtAgents =
-    overview?.active_agents ??
-    new Set(
-      reports
-        .map(
-          (report) =>
-            report.agent_id
-        )
-        .filter(Boolean)
-    ).size;
-
-  // ==========================================================
-  // RESET FILTERS
-  // ==========================================================
-
-  function resetFilters() {
-    setSearch("");
-    setStatus(
-      "All Status"
-    );
-    setDisease(
-      "All Diseases"
-    );
-    setTaluk(
-      "All Taluks"
-    );
-    setStartDate("");
-    setEndDate("");
-    setPage(1);
-  }
-
-  // ==========================================================
-  // EXPORT
-  // ==========================================================
-
-  function exportCsv() {
-    if (!filtered.length) {
-      return;
-    }
-
+  const exportCsv = () => {
     const rows =
       filtered.map(
         (report) => [
           report.report_id ||
             `RPT-${String(
               report.id
-            ).padStart(4, "0")}`,
+            ).padStart(
+              4,
+              "0"
+            )}`,
 
           report.disease,
 
@@ -1752,7 +2361,9 @@ export default function DiseaseReports({
             report.status
           ),
 
-          priorityFor(report),
+          priorityFor(
+            report
+          ),
 
           formatDate(
             report.created_at
@@ -1835,53 +2446,31 @@ export default function DiseaseReports({
     URL.revokeObjectURL(
       url
     );
-  }
+  };
 
-  // ==========================================================
-  // DATE PRESETS
-  // ==========================================================
+  /* ==========================================================
+     DATE PRESETS
+  ========================================================== */
 
-  function applyPreset(
+  const applyPreset = (
     preset
-  ) {
+  ) => {
     const today =
       new Date();
 
-    if (
-      preset === "all"
-    ) {
-      setStartDate("");
-      setEndDate("");
-      setDateOpen(false);
-      return;
-    }
-
     let start =
-      new Date(today);
-
-    const end =
-      new Date(today);
-
-    if (
-      preset === "7"
-    ) {
-      start.setDate(
-        start.getDate() -
-          6
+      new Date(
+        today
       );
-    }
 
-    if (
-      preset === "30"
-    ) {
-      start.setDate(
-        start.getDate() -
-          29
+    let end =
+      new Date(
+        today
       );
-    }
 
     if (
-      preset === "month"
+      preset ===
+      "month"
     ) {
       start =
         new Date(
@@ -1889,64 +2478,233 @@ export default function DiseaseReports({
           today.getMonth(),
           1
         );
+
+      end =
+        new Date(
+          today
+        );
+
+      end.setDate(
+        end.getDate() -
+          1
+      );
     }
 
-    setStartDate(
-      toInputDate(start)
-    );
-
-    setEndDate(
-      toInputDate(end)
-    );
-
-    setDateOpen(false);
-  }
-
-  // ==========================================================
-  // CREATE REPORT
-  // ==========================================================
-
-  async function createReport(
-    payload
-  ) {
     if (
-      !onCreateReport
+      preset ===
+      "7"
     ) {
-      setNewReportOpen(
+      start.setDate(
+        start.getDate() -
+          6
+      );
+
+      end =
+        today;
+    }
+
+    if (
+      preset ===
+      "30"
+    ) {
+      start.setDate(
+        start.getDate() -
+          29
+      );
+
+      end =
+        today;
+    }
+
+    if (
+      preset ===
+      "all"
+    ) {
+      setStartDate(
+        ""
+      );
+
+      setEndDate(
+        ""
+      );
+
+      setDateOpen(
         false
       );
 
       return;
     }
 
-    try {
-      setSaving(true);
+    setStartDate(
+      toInputDate(
+        start
+      )
+    );
 
-      await onCreateReport(
-        payload
-      );
+    setEndDate(
+      toInputDate(
+        end
+      )
+    );
 
-      setNewReportOpen(
-        false
-      );
+    setDateOpen(
+      false
+    );
+  };
 
-      // New report should be visible immediately.
-      resetFilters();
+  /* ==========================================================
+     CREATE REPORT
+  ========================================================== */
 
-    } finally {
-      setSaving(false);
-    }
-  }
+  const createReport =
+    async (
+      payload
+    ) => {
+      if (
+        !onCreateReport
+      ) {
+        setNewReportOpen(
+          false
+        );
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
+        return;
+      }
+
+      try {
+        setSaving(
+          true
+        );
+
+        await onCreateReport(
+          payload
+        );
+
+        setNewReportOpen(
+          false
+        );
+      } finally {
+        setSaving(
+          false
+        );
+      }
+    };
+
+  /* ==========================================================
+     REVIEW REPORT
+  ========================================================== */
+
+  const handleReview =
+    async (
+      report,
+      decision
+    ) => {
+      if (
+        !report?.id
+      ) {
+        return;
+      }
+
+      try {
+        setReviewing(
+          true
+        );
+
+        setReviewError(
+          ""
+        );
+
+        await api.reviewMedicalReport(
+          report.id,
+          {
+            decision,
+            review_notes:
+              "",
+          }
+        );
+
+        /*
+         * Close the drawer after successful
+         * review.
+         */
+        setSelected(
+          null
+        );
+
+        setReviewError(
+          ""
+        );
+
+        /*
+         * Refresh the report list so the
+         * new status immediately appears.
+         */
+        if (
+          onRefresh
+        ) {
+          await onRefresh();
+        }
+      } catch (
+        error
+      ) {
+        console.error(
+          "Disease report review failed:",
+          error
+        );
+
+        setReviewError(
+          error?.message ||
+            "Unable to update the report review status."
+        );
+      } finally {
+        setReviewing(
+          false
+        );
+      }
+    };
+
+  /* ==========================================================
+     DISPLAY COUNTS
+  ========================================================== */
+
+  const showingStart =
+    filtered.length
+      ? (
+          safePage -
+          1
+        ) *
+          perPage +
+        1
+      : 0;
+
+  const showingEnd =
+    Math.min(
+      safePage *
+        perPage,
+      filtered.length
+    );
+
+  const districtAgents =
+    overview?.active_agents ??
+    new Set(
+      reports
+        .map(
+          (
+            report
+          ) =>
+            report.agent_id
+        )
+        .filter(Boolean)
+    ).size;
+
+  /* ==========================================================
+     RENDER
+  ========================================================== */
 
   return (
     <div className="space-y-5">
 
       {/* ======================================================
-          DISTRICT SCOPE
+         DISTRICT SCOPE BANNER
       ====================================================== */}
 
       <div
@@ -2015,8 +2773,9 @@ export default function DiseaseReports({
                 {taluks.length}{" "}
                 taluks and{" "}
                 {districtAgents}{" "}
-                field agents reporting
-                under your supervision
+                field agents
+                reporting under
+                your supervision
               </div>
             </div>
           </div>
@@ -2031,33 +2790,69 @@ export default function DiseaseReports({
             "
           >
             <div>
-              <div className="text-[19px] font-semibold">
+              <div
+                className="
+                  text-[19px]
+                  font-semibold
+                "
+              >
                 {overview?.total_taluks ??
                   taluks.length}
               </div>
 
-              <div className="text-[9px] uppercase tracking-[.06em] text-white/85">
+              <div
+                className="
+                  text-[9px]
+                  uppercase
+                  tracking-[.06em]
+                  text-white/85
+                "
+              >
                 Taluks
               </div>
             </div>
 
             <div>
-              <div className="text-[19px] font-semibold">
+              <div
+                className="
+                  text-[19px]
+                  font-semibold
+                "
+              >
                 {districtAgents}
               </div>
 
-              <div className="text-[9px] uppercase tracking-[.06em] text-white/85">
+              <div
+                className="
+                  text-[9px]
+                  uppercase
+                  tracking-[.06em]
+                  text-white/85
+                "
+              >
                 Agents
               </div>
             </div>
 
             <div>
-              <div className="text-[19px] font-semibold">
+              <div
+                className="
+                  text-[19px]
+                  font-semibold
+                "
+              >
                 {overview?.total_reports ??
                   reports.length}
               </div>
 
-              <div className="text-[9px] uppercase tracking-[.06em] text-white/85">
+              <div
+                className="
+                  text-[9px]
+                  uppercase
+                  tracking-[.06em]
+                  text-white/85
+                "
+              >
                 Reports
               </div>
             </div>
@@ -2066,7 +2861,7 @@ export default function DiseaseReports({
       </div>
 
       {/* ======================================================
-          HEADER
+         PAGE HEADING
       ====================================================== */}
 
       <div
@@ -2096,8 +2891,8 @@ export default function DiseaseReports({
               text-[#66727D]
             "
           >
-            Case reports submitted by
-            agents across{" "}
+            Case reports submitted
+            by agents across{" "}
             {districtName}’s{" "}
             {taluks.length ||
               overview?.total_taluks ||
@@ -2118,11 +2913,12 @@ export default function DiseaseReports({
             gap-2
           "
         >
+          {/* Export */}
+
           <button
             type="button"
-            onClick={exportCsv}
-            disabled={
-              !filtered.length
+            onClick={
+              exportCsv
             }
             className="
               inline-flex
@@ -2139,8 +2935,6 @@ export default function DiseaseReports({
               text-[#26334A]
               shadow-[0_2px_8px_rgba(25,50,40,.025)]
               hover:bg-[#F7FAF8]
-              disabled:cursor-not-allowed
-              disabled:opacity-40
             "
           >
             <Download
@@ -2149,6 +2943,8 @@ export default function DiseaseReports({
 
             Export
           </button>
+
+          {/* New Report */}
 
           <button
             type="button"
@@ -2182,7 +2978,7 @@ export default function DiseaseReports({
       </div>
 
       {/* ======================================================
-          SUMMARY CARDS
+         TALUK SUMMARY CARDS
       ====================================================== */}
 
       <div
@@ -2227,7 +3023,7 @@ export default function DiseaseReports({
       </div>
 
       {/* ======================================================
-          FILTER BAR
+         FILTER BAR
       ====================================================== */}
 
       <div
@@ -2245,11 +3041,10 @@ export default function DiseaseReports({
           className="
             grid
             gap-2.5
-            xl:grid-cols-[1.45fr_.72fr_.72fr_.72fr_1fr_auto]
+            xl:grid-cols-[1.45fr_.72fr_.72fr_.72fr_1fr]
           "
         >
-
-          {/* SEARCH */}
+          {/* Search */}
 
           <label
             className="
@@ -2266,11 +3061,16 @@ export default function DiseaseReports({
           >
             <Search
               size={16}
-              className="shrink-0 text-[#758195]"
+              className="
+                shrink-0
+                text-[#758195]
+              "
             />
 
             <input
-              value={search}
+              value={
+                search
+              }
               onChange={(event) =>
                 setSearch(
                   event.target.value
@@ -2288,10 +3088,12 @@ export default function DiseaseReports({
             />
           </label>
 
-          {/* STATUS */}
+          {/* Status */}
 
           <SelectField
-            value={status}
+            value={
+              status
+            }
             onChange={(event) =>
               setStatus(
                 event.target.value
@@ -2315,10 +3117,12 @@ export default function DiseaseReports({
             </option>
           </SelectField>
 
-          {/* DISEASE */}
+          {/* Disease */}
 
           <SelectField
-            value={disease}
+            value={
+              disease
+            }
             onChange={(event) =>
               setDisease(
                 event.target.value
@@ -2329,7 +3133,7 @@ export default function DiseaseReports({
               All Diseases
             </option>
 
-            {(DISEASES || []).map(
+            {DISEASES.map(
               (item) => (
                 <option
                   key={item}
@@ -2340,10 +3144,12 @@ export default function DiseaseReports({
             )}
           </SelectField>
 
-          {/* TALUK */}
+          {/* Taluk */}
 
           <SelectField
-            value={taluk}
+            value={
+              taluk
+            }
             onChange={(event) =>
               setTaluk(
                 event.target.value
@@ -2365,7 +3171,7 @@ export default function DiseaseReports({
             )}
           </SelectField>
 
-          {/* DATE */}
+          {/* Date */}
 
           <div className="relative">
             <button
@@ -2405,7 +3211,10 @@ export default function DiseaseReports({
               >
                 <CalendarDays
                   size={15}
-                  className="shrink-0 text-[#66727D]"
+                  className="
+                    shrink-0
+                    text-[#66727D]
+                  "
                 />
 
                 <span className="truncate">
@@ -2488,10 +3297,6 @@ export default function DiseaseReports({
                       value={
                         startDate
                       }
-                      max={
-                        endDate ||
-                        undefined
-                      }
                       onChange={(
                         event
                       ) =>
@@ -2533,10 +3338,6 @@ export default function DiseaseReports({
                       type="date"
                       value={
                         endDate
-                      }
-                      min={
-                        startDate ||
-                        undefined
                       }
                       onChange={(
                         event
@@ -2686,91 +3487,11 @@ export default function DiseaseReports({
               </div>
             )}
           </div>
-
-          {/* RESET */}
-
-          <button
-            type="button"
-            onClick={
-              resetFilters
-            }
-            title="Reset filters"
-            className="
-              flex
-              h-11
-              w-11
-              items-center
-              justify-center
-              rounded-xl
-              border
-              border-[#E1E7E3]
-              bg-white
-              text-[#52627D]
-              hover:bg-[#F5F8F6]
-            "
-          >
-            <RotateCcw
-              size={15}
-            />
-          </button>
         </div>
-
-        {/* ACTIVE FILTER SUMMARY */}
-
-        {(search ||
-          status !==
-            "All Status" ||
-          disease !==
-            "All Diseases" ||
-          taluk !==
-            "All Taluks" ||
-          startDate ||
-          endDate) && (
-          <div
-            className="
-              mt-2
-              flex
-              items-center
-              justify-between
-              gap-3
-              border-t
-              border-[#EEF2EF]
-              pt-2
-            "
-          >
-            <div
-              className="
-                text-[9px]
-                text-[#788496]
-              "
-            >
-              Showing{" "}
-              <span className="font-semibold text-[#26334A]">
-                {filtered.length}
-              </span>{" "}
-              matching reports
-            </div>
-
-            <button
-              type="button"
-              onClick={
-                resetFilters
-              }
-              className="
-                text-[9px]
-                font-semibold
-                text-[#087A32]
-                hover:underline
-              "
-            >
-              Clear all filters
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ======================================================
-          REPORT LIST
+         REPORT LIST
       ====================================================== */}
 
       <section
@@ -2783,6 +3504,8 @@ export default function DiseaseReports({
           shadow-[0_4px_16px_rgba(24,54,42,.035)]
         "
       >
+        {/* List header */}
+
         <div
           className="
             flex
@@ -2837,14 +3560,14 @@ export default function DiseaseReports({
             "
           >
             Showing{" "}
-            {showingStart}–{
-              showingEnd
-            }{" "}
-            of{" "}
+            {showingStart}–
+            {showingEnd} of{" "}
             {filtered.length}{" "}
             reports
           </div>
         </div>
+
+        {/* Table */}
 
         <div className="overflow-x-auto">
           <table
@@ -2873,7 +3596,9 @@ export default function DiseaseReports({
                 ].map(
                   (heading) => (
                     <th
-                      key={heading}
+                      key={
+                        heading
+                      }
                       className="
                         border-b
                         border-[#E9EEEC]
@@ -2916,7 +3641,7 @@ export default function DiseaseReports({
                         hover:bg-[#FBFDFB]
                       "
                     >
-                      {/* REPORT ID */}
+                      {/* Report ID */}
 
                       <td
                         className="
@@ -2936,9 +3661,14 @@ export default function DiseaseReports({
                           )}`}
                       </td>
 
-                      {/* DISEASE */}
+                      {/* Disease */}
 
-                      <td className="px-5 py-3.5">
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
                         <div
                           className="
                             flex
@@ -2966,9 +3696,14 @@ export default function DiseaseReports({
                         </div>
                       </td>
 
-                      {/* TALUK */}
+                      {/* Taluk */}
 
-                      <td className="px-5 py-3.5">
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
                         <span
                           className="
                             inline-flex
@@ -2985,7 +3720,9 @@ export default function DiseaseReports({
                         >
                           <MapPin
                             size={11}
-                            className="text-[#D21D6B]"
+                            className="
+                              text-[#D21D6B]
+                            "
                           />
 
                           {report.taluk_name ||
@@ -2993,7 +3730,7 @@ export default function DiseaseReports({
                         </span>
                       </td>
 
-                      {/* AGENT */}
+                      {/* Agent */}
 
                       <td
                         className="
@@ -3008,9 +3745,14 @@ export default function DiseaseReports({
                           "—"}
                       </td>
 
-                      {/* SUBMITTED */}
+                      {/* Submitted */}
 
-                      <td className="px-5 py-3.5">
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
                         <div
                           className="
                             text-[10px]
@@ -3036,9 +3778,14 @@ export default function DiseaseReports({
                         </div>
                       </td>
 
-                      {/* STATUS */}
+                      {/* Status */}
 
-                      <td className="px-5 py-3.5">
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
                         <StatusBadge
                           tone={statusTone(
                             statusValue
@@ -3050,9 +3797,14 @@ export default function DiseaseReports({
                         </StatusBadge>
                       </td>
 
-                      {/* PRIORITY */}
+                      {/* Priority */}
 
-                      <td className="px-5 py-3.5">
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
                         <RiskBadge
                           level={
                             priority ===
@@ -3063,249 +3815,59 @@ export default function DiseaseReports({
                         />
                       </td>
 
-                      {/* ACTIONS */}
+                      {/* Actions */}
 
-                      <td className="px-5 py-3.5">
-                        <div className="relative flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelected(
-                                report
-                              )
-                            }
-                            className="
-                              flex
-                              h-8
-                              w-8
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-[#DDE5E0]
-                              text-[#087A32]
-                              hover:bg-[#F5F8F6]
-                            "
-                            aria-label="View report"
-                          >
-                            <Eye
-                              size={15}
-                            />
-                          </button>
+                      <td
+                        className="
+                          px-5
+                          py-3.5
+                        "
+                      >
+                        {/*
+                          IMPORTANT:
+                          Only the eye button remains.
+                          The three-dot menu has been
+                          completely removed.
+                        */}
 
-                          <button
-                            type="button"
-                            onClick={(
-                              event
-                            ) => {
-                              event.stopPropagation();
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelected(
+                              report
+                            );
 
-                              setMenuId(
-                                (current) =>
-                                  current ===
-                                  report.id
-                                    ? null
-                                    : report.id
-                              );
-                            }}
-                            className="
-                              flex
-                              h-8
-                              w-8
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-[#DDE5E0]
-                              text-[#087A32]
-                              hover:bg-[#F5F8F6]
-                            "
-                            aria-label="More actions"
-                          >
-                            <MoreVertical
-                              size={15}
-                            />
-                          </button>
-
-                          {menuId ===
-                            report.id && (
-                            <div
-                              className="
-                                absolute
-                                right-0
-                                top-9
-                                z-30
-                                w-[160px]
-                                overflow-hidden
-                                rounded-xl
-                                border
-                                border-[#E0E7E3]
-                                bg-white
-                                p-1.5
-                                shadow-[0_15px_35px_rgba(16,42,67,.14)]
-                              "
-                              onMouseDown={(
-                                event
-                              ) =>
-                                event.stopPropagation()
-                              }
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelected(
-                                    report
-                                  );
-                                  setMenuId(
-                                    null
-                                  );
-                                }}
-                                className="
-                                  flex
-                                  w-full
-                                  items-center
-                                  gap-2
-                                  rounded-lg
-                                  px-2.5
-                                  py-2
-                                  text-left
-                                  text-[10px]
-                                  font-medium
-                                  hover:bg-[#F5F8F6]
-                                "
-                              >
-                                <Eye
-                                  size={13}
-                                />
-
-                                View details
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const csv =
-                                    [
-                                      [
-                                        "Report ID",
-                                        report.report_id ||
-                                          report.id,
-                                      ],
-                                      [
-                                        "Disease",
-                                        report.disease,
-                                      ],
-                                      [
-                                        "Taluk",
-                                        report.taluk_name,
-                                      ],
-                                      [
-                                        "Agent",
-                                        report.agent_name,
-                                      ],
-                                      [
-                                        "Cases",
-                                        report.cases,
-                                      ],
-                                      [
-                                        "Status",
-                                        statusValue,
-                                      ],
-                                      [
-                                        "Priority",
-                                        priority,
-                                      ],
-                                      [
-                                        "Submitted",
-                                        formatDate(
-                                          report.created_at
-                                        ),
-                                      ],
-                                    ]
-                                      .map(
-                                        ([
-                                          key,
-                                          value,
-                                        ]) =>
-                                          `"${key}","${String(
-                                            value ??
-                                              ""
-                                          ).replaceAll(
-                                            '"',
-                                            '""'
-                                          )}"`
-                                      )
-                                      .join(
-                                        "\n"
-                                      );
-
-                                  const blob =
-                                    new Blob(
-                                      [csv],
-                                      {
-                                        type:
-                                          "text/csv;charset=utf-8",
-                                      }
-                                    );
-
-                                  const url =
-                                    URL.createObjectURL(
-                                      blob
-                                    );
-
-                                  const anchor =
-                                    document.createElement(
-                                      "a"
-                                    );
-
-                                  anchor.href =
-                                    url;
-
-                                  anchor.download =
-                                    `${
-                                      report.report_id ||
-                                      `RPT-${report.id}`
-                                    }.csv`;
-
-                                  document.body.appendChild(
-                                    anchor
-                                  );
-
-                                  anchor.click();
-
-                                  anchor.remove();
-
-                                  URL.revokeObjectURL(
-                                    url
-                                  );
-
-                                  setMenuId(
-                                    null
-                                  );
-                                }}
-                                className="
-                                  flex
-                                  w-full
-                                  items-center
-                                  gap-2
-                                  rounded-lg
-                                  px-2.5
-                                  py-2
-                                  text-left
-                                  text-[10px]
-                                  font-medium
-                                  hover:bg-[#F5F8F6]
-                                "
-                              >
-                                <Download
-                                  size={13}
-                                />
-
-                                Export report
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                            setReviewError(
+                              ""
+                            );
+                          }}
+                          className="
+                            flex
+                            h-8
+                            w-8
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-[#DDE5E0]
+                            bg-white
+                            text-[#087A32]
+                            transition
+                            hover:border-[#BFD8C8]
+                            hover:bg-[#F5F8F6]
+                            hover:shadow-sm
+                            focus:outline-none
+                            focus:ring-2
+                            focus:ring-[#087A32]/10
+                          "
+                          aria-label="View report"
+                          title="View Report"
+                        >
+                          <Eye
+                            size={15}
+                            strokeWidth={1.8}
+                          />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -3314,15 +3876,13 @@ export default function DiseaseReports({
             </tbody>
           </table>
 
-          {/* ==================================================
-              EMPTY STATE
-          ================================================== */}
+          {/* Empty */}
 
           {!visible.length && (
             <div
               className="
                 px-5
-                py-14
+                py-12
                 text-center
               "
             >
@@ -3330,8 +3890,8 @@ export default function DiseaseReports({
                 className="
                   mx-auto
                   flex
-                  h-12
-                  w-12
+                  h-11
+                  w-11
                   items-center
                   justify-center
                   rounded-full
@@ -3340,7 +3900,7 @@ export default function DiseaseReports({
                 "
               >
                 <Search
-                  size={19}
+                  size={18}
                 />
               </div>
 
@@ -3362,47 +3922,17 @@ export default function DiseaseReports({
                   text-[#718096]
                 "
               >
-                {reports.length
-                  ? "The current filters are hiding the available reports."
-                  : "No disease reports were returned by the backend."}
+                Try changing the
+                search or filter
+                values.
               </div>
-
-              {reports.length >
-                0 && (
-                <button
-                  type="button"
-                  onClick={
-                    resetFilters
-                  }
-                  className="
-                    mt-4
-                    inline-flex
-                    items-center
-                    gap-2
-                    rounded-lg
-                    bg-[#087A32]
-                    px-3.5
-                    py-2
-                    text-[10px]
-                    font-semibold
-                    text-white
-                    hover:bg-[#066728]
-                  "
-                >
-                  <RotateCcw
-                    size={13}
-                  />
-
-                  Clear filters
-                </button>
-              )}
             </div>
           )}
         </div>
 
-        {/* ==================================================
-            PAGINATION
-        ================================================== */}
+        {/* ====================================================
+           PAGINATION
+        ==================================================== */}
 
         <div
           className="
@@ -3434,6 +3964,8 @@ export default function DiseaseReports({
               gap-1
             "
           >
+            {/* First */}
+
             <button
               type="button"
               disabled={
@@ -3462,6 +3994,8 @@ export default function DiseaseReports({
               />
             </button>
 
+            {/* Previous */}
+
             <button
               type="button"
               disabled={
@@ -3469,7 +4003,9 @@ export default function DiseaseReports({
               }
               onClick={() =>
                 setPage(
-                  (value) =>
+                  (
+                    value
+                  ) =>
                     Math.max(
                       1,
                       value - 1
@@ -3495,6 +4031,8 @@ export default function DiseaseReports({
                 size={14}
               />
             </button>
+
+            {/* Page numbers */}
 
             {Array.from(
               {
@@ -3555,6 +4093,8 @@ export default function DiseaseReports({
                 )
               )}
 
+            {/* Next */}
+
             <button
               type="button"
               disabled={
@@ -3563,7 +4103,9 @@ export default function DiseaseReports({
               }
               onClick={() =>
                 setPage(
-                  (value) =>
+                  (
+                    value
+                  ) =>
                     Math.min(
                       pageCount,
                       value + 1
@@ -3589,6 +4131,8 @@ export default function DiseaseReports({
                 size={14}
               />
             </button>
+
+            {/* Last */}
 
             <button
               type="button"
@@ -3625,7 +4169,7 @@ export default function DiseaseReports({
       </section>
 
       {/* ======================================================
-          FOOTER
+         FOOTER INFORMATION
       ====================================================== */}
 
       <div
@@ -3675,22 +4219,51 @@ export default function DiseaseReports({
       </div>
 
       {/* ======================================================
-          MODALS
+         REVIEW DRAWER
       ====================================================== */}
 
       {selected && (
-        <ReportDetails
-          report={selected}
-          onClose={() =>
-            setSelected(null)
+        <ReportReviewDrawer
+          report={
+            selected
+          }
+          onClose={() => {
+            if (
+              !reviewing
+            ) {
+              setSelected(
+                null
+              );
+
+              setReviewError(
+                ""
+              );
+            }
+          }}
+          onReview={
+            handleReview
+          }
+          reviewing={
+            reviewing
+          }
+          reviewError={
+            reviewError
           }
         />
       )}
 
+      {/* ======================================================
+         NEW REPORT MODAL
+      ====================================================== */}
+
       {newReportOpen && (
         <NewReportModal
-          agents={agents}
-          saving={saving}
+          agents={
+            agents
+          }
+          saving={
+            saving
+          }
           onClose={() =>
             !saving &&
             setNewReportOpen(

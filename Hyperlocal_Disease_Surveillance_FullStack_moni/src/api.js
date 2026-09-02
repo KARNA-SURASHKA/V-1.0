@@ -5,6 +5,7 @@
 // Keep the frontend and backend on the same loopback hostname.
 // Backend:
 //   uvicorn app.main:app --reload
+//
 // Usually available at:
 //   http://127.0.0.1:8000
 //
@@ -543,6 +544,54 @@ const api = {
       {
         method: "POST",
         body: payload,
+      }
+    );
+  },
+
+  // ==========================================================
+  // MEDICAL SUPERVISOR DISEASE REPORT REVIEW
+  // ==========================================================
+
+  reviewMedicalReport: async (
+    reportId,
+    payload = {}
+  ) => {
+    if (
+      reportId === undefined ||
+      reportId === null ||
+      reportId === ""
+    ) {
+      throw new Error(
+        "A valid disease report ID is required."
+      );
+    }
+
+    const decision = String(
+      payload?.decision || ""
+    ).trim().toUpperCase();
+
+    const allowedDecisions = [
+      "APPROVE",
+      "REJECT",
+      "KEEP_PENDING",
+    ];
+
+    if (!allowedDecisions.includes(decision)) {
+      throw new Error(
+        "Invalid review decision. Use APPROVE, REJECT or KEEP_PENDING."
+      );
+    }
+
+    return request(
+      `/medical/reports/${reportId}/review`,
+      {
+        method: "PUT",
+        body: {
+          decision,
+          review_notes: String(
+            payload?.review_notes || ""
+          ).trim(),
+        },
       }
     );
   },
