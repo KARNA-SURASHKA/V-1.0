@@ -21,8 +21,6 @@ import remarkGfm from "remark-gfm";
 
 import { api } from "../../api";
 
-import { useAuth } from "../../context/AuthContext";
-
 import heroRight
   from "../../assets/ui/medical-hero-right.png";
 
@@ -49,7 +47,6 @@ function MedicalMarkdown({
 }) {
 
   return (
-
     <div
       className="
         break-words
@@ -58,7 +55,6 @@ function MedicalMarkdown({
         text-[#111820]
       "
     >
-
       <ReactMarkdown
         remarkPlugins={[
           remarkGfm,
@@ -176,25 +172,34 @@ function MedicalMarkdown({
       >
         {content || ""}
       </ReactMarkdown>
-
     </div>
-
   );
 }
 
 
 export default function MedicalChatbot({
+  username,
   selectedLocation,
 }) {
 
-  const { session } = useAuth();
+  /*
+   * ==========================================================
+   * USERNAME
+   * ==========================================================
+   *
+   * The citizen portal already receives the username from
+   * UserEntry/App.jsx and passes it to UserPortal.
+   *
+   * UserPortal now passes that same username to this component.
+   *
+   * This avoids using useAuth(), which belongs to the
+   * role-based authenticated portal flow.
+   */
 
-  const username =
-    session?.username ||
-    session?.user?.username ||
-    session?.user?.name ||
-    session?.name ||
+  const displayUsername =
+    String(username || "").trim() ||
     "User";
+
 
   const [
     messages,
@@ -238,8 +243,11 @@ export default function MedicalChatbot({
 
 
   /*
+   * ==========================================================
    * CLEAR CHAT
+   * ==========================================================
    */
+
   const clearChat = () => {
 
     if (loading) {
@@ -253,8 +261,11 @@ export default function MedicalChatbot({
 
 
   /*
+   * ==========================================================
    * SEND MESSAGE
+   * ==========================================================
    */
+
   const sendMessage = async (
     value = input
   ) => {
@@ -393,6 +404,12 @@ export default function MedicalChatbot({
   };
 
 
+  /*
+   * ==========================================================
+   * KEYBOARD HANDLER
+   * ==========================================================
+   */
+
   const handleKeyDown = (
     event
   ) => {
@@ -506,7 +523,7 @@ export default function MedicalChatbot({
               text-[#101A31]
             "
           >
-            Hello {username}! 👋
+            Hello {displayUsername}! 👋
           </h1>
 
 
@@ -537,17 +554,6 @@ export default function MedicalChatbot({
           </p>
 
         </div>
-
-
-        {/* =================================================
-            HERO CLEAR CHAT BUTTON REMOVED
-            =================================================
-
-            The Trash2 button that was previously here
-            has intentionally been removed.
-
-            Clear Chat now exists ONLY in the chat header.
-        */}
 
 
         {/* HERO TABS */}
@@ -763,45 +769,48 @@ export default function MedicalChatbot({
                       }
                       className="
                         flex
-                        h-[61px]
+                        min-h-[58px]
                         items-center
-                        gap-[14px]
+                        gap-[12px]
                         rounded-[13px]
                         border
-                        border-[#DCE8E0]
+                        border-[#DDE8E1]
                         bg-white
                         px-[16px]
                         text-left
-                        text-[14px]
-                        text-[#405064]
+                        text-[13px]
+                        font-medium
+                        text-[#38516B]
                         transition
-                        hover:border-[#A9D3B8]
-                        hover:bg-[#FBFEFC]
+                        hover:border-[#A9D6B9]
+                        hover:bg-[#F7FCF8]
                       "
                     >
 
                       <span
                         className="
                           flex
-                          h-[32px]
-                          w-[32px]
+                          h-[30px]
+                          w-[30px]
                           shrink-0
                           items-center
                           justify-center
                           rounded-full
-                          bg-[#F0F9F2]
+                          bg-[#EDF8F0]
                           text-[#087A32]
                         "
                       >
 
                         <MessageSquareText
-                          size={17}
-                          strokeWidth={1.7}
+                          size={15}
+                          strokeWidth={1.8}
                         />
 
                       </span>
 
-                      {question}
+                      <span>
+                        {question}
+                      </span>
 
                     </button>
 
@@ -810,156 +819,165 @@ export default function MedicalChatbot({
 
               </div>
 
-            </div>
 
+              {/* INPUT */}
 
-            {/* INPUT */}
-
-            <div
-              className="
-                absolute
-                bottom-[70px]
-                left-[40px]
-                right-[40px]
-                flex
-                h-[70px]
-                items-center
-                rounded-[16px]
-                border
-                border-[#47B378]
-                bg-white
-                px-[15px]
-                shadow-[0_2px_11px_rgba(39,135,83,0.12)]
-                focus-within:border-[#1E9653]
-              "
-            >
-
-              <span
+              <div
                 className="
-                  mr-[13px]
-                  text-[#17A45A]
+                  mt-[30px]
+                  flex
+                  w-full
+                  max-w-[640px]
+                  items-center
+                  gap-[10px]
+                  rounded-[14px]
+                  border
+                  border-[#55BE79]
+                  bg-white
+                  px-[10px]
+                  py-[7px]
+                  shadow-[0_1px_5px_rgba(16,42,67,0.04)]
                 "
               >
 
                 <Bot
-                  size={24}
+                  size={19}
                   strokeWidth={1.8}
+                  className="
+                    ml-[5px]
+                    shrink-0
+                    text-[#087A32]
+                  "
                 />
 
-              </span>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(event) =>
+                    setInput(
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={
+                    handleKeyDown
+                  }
+                  placeholder="Type your medical question here..."
+                  className="
+                    min-w-0
+                    flex-1
+                    bg-transparent
+                    px-[4px]
+                    py-[10px]
+                    text-[13px]
+                    text-[#102A43]
+                    outline-none
+                    placeholder:text-[#91A1B2]
+                  "
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    sendMessage()
+                  }
+                  disabled={
+                    loading ||
+                    !input.trim()
+                  }
+                  className="
+                    flex
+                    h-[43px]
+                    w-[43px]
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-[#9ED8B4]
+                    text-white
+                    transition
+                    hover:bg-[#087A32]
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
+                >
+
+                  {loading ? (
+
+                    <Loader2
+                      size={19}
+                      className="
+                        animate-spin
+                      "
+                    />
+
+                  ) : (
+
+                    <Send
+                      size={19}
+                      strokeWidth={1.8}
+                    />
+
+                  )}
+
+                </button>
+
+              </div>
 
 
-              <textarea
-                value={input}
-                onChange={(e) =>
-                  setInput(
-                    e.target.value
-                  )
-                }
-                onKeyDown={
-                  handleKeyDown
-                }
-                rows={1}
-                placeholder="Type your medical question here..."
-                aria-label="Medical question"
+              <p
                 className="
-                  min-h-[25px]
-                  flex-1
-                  resize-none
-                  overflow-hidden
-                  bg-transparent
-                  px-1
-                  py-1
-                  text-[14px]
-                  leading-[25px]
-                  text-[#151719]
-                  outline-none
-                  placeholder:text-[#8B96A4]
-                "
-              />
-
-
-              <button
-                type="button"
-                onClick={() =>
-                  sendMessage()
-                }
-                disabled={
-                  loading ||
-                  !input.trim()
-                }
-                aria-label="Send medical question"
-                className="
-                  flex
-                  h-[43px]
-                  w-[43px]
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-[#168F48]
-                  text-white
-                  shadow-sm
-                  disabled:opacity-40
+                  mt-[18px]
+                  text-[10px]
+                  text-[#8A98A8]
                 "
               >
-
-                <Send
-                  size={21}
-                />
-
-              </button>
+                Please note: I provide general
+                information only and not a
+                diagnosis or medical advice.
+              </p>
 
             </div>
-
-
-            <p
-              className="
-                absolute
-                bottom-[31px]
-                left-0
-                right-0
-                text-center
-                text-[11px]
-                text-[#8A94A0]
-              "
-            >
-              Please note: I provide general information only
-              and not a diagnosis or medical advice.
-            </p>
 
           </section>
 
 
-          {/* DOCTOR */}
+          {/* RIGHT INFORMATION PANEL */}
 
           <aside
             className="
               flex
               flex-col
-              items-center
-              pt-[5px]
+              gap-[20px]
             "
           >
 
-            <img
-              src={doctor}
-              alt="Medical guidance"
+            <div
               className="
-                h-[300px]
-                w-[280px]
-                object-contain
-                object-bottom
+                flex
+                justify-center
+                overflow-hidden
+                rounded-[17px]
+                bg-[#F8FCF9]
               "
-            />
+            >
+
+              <img
+                src={doctor}
+                alt="Medical guidance"
+                className="
+                  h-[285px]
+                  w-full
+                  object-contain
+                "
+              />
+
+            </div>
 
 
             <div
               className="
-                mt-[25px]
-                w-full
-                rounded-[15px]
-                bg-[#F3FAF4]
+                rounded-[17px]
+                bg-[#F1FAF4]
                 px-[25px]
                 py-[22px]
                 text-center
@@ -968,40 +986,50 @@ export default function MedicalChatbot({
 
               <div
                 className="
+                  mx-auto
                   flex
+                  h-[36px]
+                  w-[36px]
                   items-center
                   justify-center
-                  gap-2
-                  text-[14px]
-                  font-semibold
-                  text-[#078445]
+                  rounded-full
+                  bg-[#E0F3E6]
+                  text-[#087A32]
                 "
               >
 
                 <ShieldCheck
-                  size={20}
-                  fill="#1A9A50"
-                  className="text-white"
+                  size={18}
+                  strokeWidth={1.8}
                 />
-
-                Your health, our priority
 
               </div>
 
 
-              <p
+              <h3
                 className="
-                  mt-[14px]
-                  text-[12px]
-                  leading-[1.75]
-                  text-[#405064]
+                  mt-[11px]
+                  text-[13px]
+                  font-semibold
+                  text-[#087A32]
                 "
               >
-                I'm here to help you with reliable
-                <br />
-                information and guidance for a
-                <br />
-                healthier you and your family.
+                Your health, our priority
+              </h3>
+
+
+              <p
+                className="
+                  mt-[9px]
+                  text-[11px]
+                  leading-[1.7]
+                  text-[#506273]
+                "
+              >
+                I'm here to help you with
+                reliable information and
+                guidance for a healthier
+                you and your family.
               </p>
 
             </div>
@@ -1022,26 +1050,19 @@ export default function MedicalChatbot({
         <div
           className="
             mx-auto
-            mt-[30px]
-            grid
+            mt-[32px]
             max-w-[1250px]
-            grid-cols-[minmax(0,1fr)_280px]
-            gap-[28px]
           "
         >
 
           <section
             className="
-              relative
-              min-h-[600px]
               overflow-hidden
               rounded-[17px]
               border
               border-[#E3E8E5]
               bg-white
-              px-[24px]
-              pb-[112px]
-              pt-[24px]
+              shadow-[0_1px_4px_rgba(16,42,67,0.02)]
             "
           >
 
@@ -1049,27 +1070,77 @@ export default function MedicalChatbot({
 
             <div
               className="
-                mb-[18px]
                 flex
                 items-center
                 justify-between
                 border-b
-                border-[#E9EDE9]
-                pb-[12px]
+                border-[#E5EBE7]
+                bg-[#F8FCF9]
+                px-[24px]
+                py-[16px]
               "
             >
 
-              <p
+              <div
                 className="
-                  text-[12px]
-                  text-[#7A8598]
+                  flex
+                  items-center
+                  gap-[12px]
                 "
               >
-                Medical Assistant • {locationName}
-              </p>
+
+                <div
+                  className="
+                    flex
+                    h-[42px]
+                    w-[42px]
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-[#E5F5E9]
+                  "
+                >
+
+                  <img
+                    src={botAvatar}
+                    alt=""
+                    className="
+                      h-[34px]
+                      w-[34px]
+                      object-contain
+                    "
+                  />
+
+                </div>
 
 
-              {/* CLEAR CHAT REMAINS HERE */}
+                <div>
+
+                  <h2
+                    className="
+                      text-[15px]
+                      font-semibold
+                      text-[#102A43]
+                    "
+                  >
+                    Medical Assistant
+                  </h2>
+
+                  <p
+                    className="
+                      mt-[2px]
+                      text-[10px]
+                      text-[#758496]
+                    "
+                  >
+                    General medical information
+                    and supportive guidance
+                  </p>
+
+                </div>
+
+              </div>
+
 
               <button
                 type="button"
@@ -1080,42 +1151,50 @@ export default function MedicalChatbot({
                 className="
                   flex
                   items-center
-                  gap-2
-                  rounded-lg
-                  px-2
-                  py-1.5
-                  text-[12px]
-                  text-[#6A7480]
-                  transition
-                  hover:bg-[#F5F8F6]
+                  gap-[6px]
+                  rounded-[9px]
+                  border
+                  border-[#DDE5E0]
+                  bg-white
+                  px-[11px]
+                  py-[8px]
+                  text-[10px]
+                  font-medium
+                  text-[#617182]
+                  hover:bg-[#F8FAF9]
                   disabled:cursor-not-allowed
-                  disabled:opacity-40
+                  disabled:opacity-50
                 "
               >
 
                 <Trash2
-                  size={15}
+                  size={14}
+                  strokeWidth={1.7}
                 />
 
-                Clear chat
+                Clear Chat
 
               </button>
 
             </div>
 
 
-            {/* MESSAGES */}
+            {/* CHAT MESSAGES */}
 
             <div
               className="
-                max-h-[455px]
+                min-h-[480px]
+                max-h-[560px]
                 overflow-y-auto
-                pr-[8px]
+                px-[28px]
+                py-[25px]
               "
             >
 
               <div
                 className="
+                  mx-auto
+                  max-w-[850px]
                   space-y-[18px]
                 "
               >
@@ -1126,65 +1205,65 @@ export default function MedicalChatbot({
                     index
                   ) => {
 
-                    const user =
+                    const isUser =
                       message.role ===
                       "user";
-
 
                     return (
 
                       <div
-                        key={`${message.role}-${index}`}
+                        key={
+                          `${message.time}-${index}`
+                        }
                         className={`
                           flex
                           ${
-                            user
+                            isUser
                               ? "justify-end"
                               : "justify-start"
                           }
                         `}
                       >
 
-                        {!user && (
-
-                          <img
-                            src={botAvatar}
-                            alt=""
-                            className="
-                              mr-[12px]
-                              mt-[2px]
-                              h-[43px]
-                              w-[43px]
-                              shrink-0
-                              rounded-full
-                              object-contain
-                            "
-                          />
-
-                        )}
-
-
                         <div
                           className={`
-                            max-w-[680px]
+                            max-w-[75%]
                             ${
-                              user
-                                ? "rounded-[15px] rounded-br-[4px] bg-[#EAF8EC] px-[17px] py-[11px]"
-                                : "rounded-[15px] border border-[#E0E6E1] bg-white px-[17px] py-[12px]"
+                              isUser
+                                ? `
+                                  rounded-[16px]
+                                  rounded-br-[5px]
+                                  bg-[#087A32]
+                                  px-[17px]
+                                  py-[12px]
+                                  text-white
+                                `
+                                : `
+                                  rounded-[16px]
+                                  rounded-bl-[5px]
+                                  border
+                                  border-[#E0E9E3]
+                                  bg-[#F8FBF9]
+                                  px-[17px]
+                                  py-[12px]
+                                `
                             }
                           `}
                         >
 
-                          {user ? (
+                          {isUser ? (
 
                             <p
                               className="
+                                whitespace-pre-wrap
+                                break-words
                                 text-[13px]
-                                leading-6
-                                text-[#10231A]
+                                leading-[1.65]
                               "
                             >
-                              {message.content}
+                              {
+                                message.content
+                              }
                             </p>
 
                           ) : (
@@ -1198,16 +1277,21 @@ export default function MedicalChatbot({
                           )}
 
 
-                          <p
-                            className="
-                              mt-[4px]
-                              text-right
-                              text-[10px]
-                              text-[#7C858C]
-                            "
+                          <div
+                            className={`
+                              mt-[6px]
+                              text-[9px]
+                              ${
+                                isUser
+                                  ? "text-white/70"
+                                  : "text-[#8A98A8]"
+                              }
+                            `}
                           >
-                            {message.time}
-                          </p>
+                            {
+                              message.time
+                            }
+                          </div>
 
                         </div>
 
@@ -1224,50 +1308,43 @@ export default function MedicalChatbot({
                   <div
                     className="
                       flex
-                      items-start
+                      justify-start
                     "
                   >
-
-                    <img
-                      src={botAvatar}
-                      alt=""
-                      className="
-                        mr-[12px]
-                        h-[43px]
-                        w-[43px]
-                        rounded-full
-                      "
-                    />
-
 
                     <div
                       className="
                         flex
                         items-center
-                        gap-2
-                        rounded-[15px]
+                        gap-[9px]
+                        rounded-[16px]
+                        rounded-bl-[5px]
                         border
-                        border-[#E0E6E1]
-                        px-4
-                        py-3
-                        text-[12px]
-                        text-[#6B7379]
+                        border-[#E0E9E3]
+                        bg-[#F8FBF9]
+                        px-[17px]
+                        py-[13px]
+                        text-[11px]
+                        text-[#718096]
                       "
                     >
 
                       <Loader2
                         size={15}
-                        className="animate-spin"
+                        className="
+                          animate-spin
+                          text-[#087A32]
+                        "
                       />
 
-                      Medical assistant is thinking...
+                      Medical Assistant
+                      is thinking...
 
                     </div>
 
                   </div>
 
                 )}
-
 
                 <div
                   ref={
@@ -1284,209 +1361,149 @@ export default function MedicalChatbot({
 
             <div
               className="
-                absolute
-                bottom-[25px]
-                left-[24px]
-                right-[24px]
-                flex
-                h-[64px]
-                items-center
-                rounded-[15px]
-                border
-                border-[#47B378]
+                border-t
+                border-[#E5EBE7]
                 bg-white
-                px-[13px]
-                shadow-[0_2px_11px_rgba(39,135,83,0.12)]
-              "
-            >
-
-              <button
-                type="button"
-                className="
-                  mr-[10px]
-                  text-[#7B8792]
-                "
-                aria-label="Attach"
-              >
-
-                <Paperclip
-                  size={19}
-                />
-
-              </button>
-
-
-              <textarea
-                value={input}
-                onChange={(e) =>
-                  setInput(
-                    e.target.value
-                  )
-                }
-                onKeyDown={
-                  handleKeyDown
-                }
-                rows={1}
-                placeholder="Ask me anything about health, precautions, risks..."
-                className="
-                  min-h-[24px]
-                  flex-1
-                  resize-none
-                  overflow-hidden
-                  bg-transparent
-                  px-1
-                  py-1
-                  text-[14px]
-                  leading-[24px]
-                  outline-none
-                  placeholder:text-[#8B96A4]
-                "
-              />
-
-
-              <button
-                type="button"
-                onClick={() =>
-                  sendMessage()
-                }
-                disabled={
-                  loading ||
-                  !input.trim()
-                }
-                className="
-                  flex
-                  h-[43px]
-                  w-[43px]
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-[#168F48]
-                  text-white
-                  disabled:opacity-40
-                "
-              >
-
-                <Send
-                  size={20}
-                />
-
-              </button>
-
-            </div>
-
-          </section>
-
-
-          {/* RIGHT DOCTOR */}
-
-          <aside
-            className="
-              flex
-              flex-col
-              items-center
-              pt-[5px]
-            "
-          >
-
-            <img
-              src={doctor}
-              alt="Medical guidance"
-              className="
-                h-[300px]
-                w-[280px]
-                object-contain
-                object-bottom
-              "
-            />
-
-
-            <div
-              className="
-                mt-[25px]
-                w-full
-                rounded-[15px]
-                bg-[#F3FAF4]
-                px-[25px]
-                py-[22px]
-                text-center
+                px-[24px]
+                py-[18px]
               "
             >
 
               <div
                 className="
+                  mx-auto
                   flex
+                  max-w-[850px]
                   items-center
-                  justify-center
-                  gap-2
-                  text-[14px]
-                  font-semibold
-                  text-[#078445]
+                  gap-[9px]
+                  rounded-[14px]
+                  border
+                  border-[#55BE79]
+                  bg-white
+                  px-[10px]
+                  py-[6px]
                 "
               >
 
-                <ShieldCheck
-                  size={20}
+                <Bot
+                  size={18}
+                  className="
+                    ml-[5px]
+                    shrink-0
+                    text-[#087A32]
+                  "
                 />
 
-                Your health, our priority
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(event) =>
+                    setInput(
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={
+                    handleKeyDown
+                  }
+                  placeholder="Type your medical question here..."
+                  disabled={loading}
+                  className="
+                    min-w-0
+                    flex-1
+                    bg-transparent
+                    px-[4px]
+                    py-[10px]
+                    text-[13px]
+                    outline-none
+                    placeholder:text-[#91A1B2]
+                  "
+                />
+
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    sendMessage()
+                  }
+                  disabled={
+                    loading ||
+                    !input.trim()
+                  }
+                  className="
+                    flex
+                    h-[41px]
+                    w-[41px]
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-[#9ED8B4]
+                    text-white
+                    transition
+                    hover:bg-[#087A32]
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
+                >
+
+                  {loading ? (
+
+                    <Loader2
+                      size={18}
+                      className="
+                        animate-spin
+                      "
+                    />
+
+                  ) : (
+
+                    <Send
+                      size={18}
+                      strokeWidth={1.8}
+                    />
+
+                  )}
+
+                </button>
 
               </div>
 
 
-              <p
+              <div
                 className="
-                  mt-[14px]
-                  text-[12px]
-                  leading-[1.75]
-                  text-[#405064]
+                  mx-auto
+                  mt-[9px]
+                  flex
+                  max-w-[850px]
+                  items-center
+                  justify-center
+                  gap-[5px]
+                  text-center
+                  text-[9px]
+                  text-[#8A98A8]
                 "
               >
-                I'm here to help you with reliable
-                information and guidance for a healthier
-                you and your family.
-              </p>
+
+                <ShieldCheck
+                  size={11}
+                  strokeWidth={1.7}
+                />
+
+                General information only.
+                Not a diagnosis or medical advice.
+
+              </div>
 
             </div>
 
-          </aside>
+          </section>
 
         </div>
 
       )}
 
-
-      {/* FOOTER DISCLAIMER */}
-
-      <p
-        className="
-          mx-auto
-          mt-[24px]
-          max-w-[1250px]
-          text-center
-          text-[12px]
-          text-[#687487]
-        "
-      >
-
-        <ShieldCheck
-          size={15}
-          className="
-            mr-2
-            inline-block
-          "
-        />
-
-        Information provided here is for general
-        awareness only.
-
-        <br />
-
-        For medical emergencies, please contact
-        your healthcare provider.
-
-      </p>
-
     </section>
 
   );
+
 }
