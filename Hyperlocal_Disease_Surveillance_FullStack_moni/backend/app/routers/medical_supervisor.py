@@ -27,7 +27,9 @@ router = APIRouter(
     tags=["medical supervisor district scope"],
 )
 
-supervisor_only = auth.require_role("medical_supervisor")
+supervisor_only = auth.require_role(
+    "medical_supervisor"
+)
 
 
 # ============================================================
@@ -39,10 +41,12 @@ def supervisor_district(
     user: models.User,
 ):
     """
-    Return the district assigned to the logged-in Medical Supervisor.
+    Return the district assigned to the logged-in
+    Medical Supervisor.
 
-    Older supervisor accounts that do not yet have a district assigned
-    fall back to Kodagu for backward compatibility.
+    Older supervisor accounts that do not yet have a
+    district assigned fall back to Kodagu for backward
+    compatibility.
     """
 
     district_id = getattr(
@@ -54,18 +58,26 @@ def supervisor_district(
     if district_id:
         district = (
             db.query(models.District)
-            .filter(models.District.id == district_id)
+            .filter(
+                models.District.id
+                == district_id
+            )
             .first()
         )
 
         if district:
             return district
 
-    # Backward-compatible fallback
+    # --------------------------------------------------------
+    # BACKWARD-COMPATIBLE KODAGU FALLBACK
+    # --------------------------------------------------------
+
     district = (
         db.query(models.District)
         .filter(
-            models.District.name.ilike("Kodagu")
+            models.District.name.ilike(
+                "Kodagu"
+            )
         )
         .first()
     )
@@ -109,7 +121,9 @@ def report_query(
     )
 
     query = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
             models.DiseaseReport.taluk_id.in_(
                 taluk_ids or [-1]
@@ -124,23 +138,35 @@ def report_query(
 # DISEASE REPORT REVIEW STORAGE
 # ============================================================
 
-def ensure_disease_report_review_columns(db: Session):
+def ensure_disease_report_review_columns(
+    db: Session,
+):
     """
-    Ensure the existing SQLite disease_reports table has the fields
-    required by the Medical Supervisor review workflow.
+    Ensure the existing SQLite disease_reports table has
+    the fields required by the Medical Supervisor review
+    workflow.
 
-    This is intentionally backward-compatible with an existing
-    surveillance.db so existing reports are preserved.
+    This is intentionally backward-compatible with an
+    existing surveillance.db so existing reports are preserved.
     """
+
     try:
+
         columns = {
             row[1]
             for row in db.execute(
-                text("PRAGMA table_info(disease_reports)")
+                text(
+                    "PRAGMA table_info(disease_reports)"
+                )
             ).fetchall()
         }
 
+        # ----------------------------------------------------
+        # REVIEW STATUS
+        # ----------------------------------------------------
+
         if "review_status" not in columns:
+
             db.execute(
                 text(
                     """
@@ -151,7 +177,12 @@ def ensure_disease_report_review_columns(db: Session):
                 )
             )
 
+        # ----------------------------------------------------
+        # REVIEW NOTES
+        # ----------------------------------------------------
+
         if "review_notes" not in columns:
+
             db.execute(
                 text(
                     """
@@ -161,7 +192,12 @@ def ensure_disease_report_review_columns(db: Session):
                 )
             )
 
+        # ----------------------------------------------------
+        # REVIEWED BY
+        # ----------------------------------------------------
+
         if "reviewed_by" not in columns:
+
             db.execute(
                 text(
                     """
@@ -171,7 +207,12 @@ def ensure_disease_report_review_columns(db: Session):
                 )
             )
 
+        # ----------------------------------------------------
+        # REVIEWED AT
+        # ----------------------------------------------------
+
         if "reviewed_at" not in columns:
+
             db.execute(
                 text(
                     """
@@ -182,6 +223,7 @@ def ensure_disease_report_review_columns(db: Session):
             )
 
         db.commit()
+
     except Exception:
         db.rollback()
         raise
@@ -203,20 +245,24 @@ def overview(
 
     now = datetime.utcnow()
 
-    week = current_week_number(now)
+    week = current_week_number(
+        now
+    )
+
     previous_week = current_week_number(
         now - timedelta(days=7)
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # ACTIVE AGENTS
-    # --------------------------------------------------------
+    # ========================================================
 
     agents = (
         db.query(models.Agent)
         .join(
             models.User,
-            models.Agent.user_id == models.User.id,
+            models.Agent.user_id
+            == models.User.id,
         )
         .filter(
             models.Agent.taluk_id.in_(
@@ -227,23 +273,28 @@ def overview(
         .all()
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # CURRENT / PREVIOUS WEEK REPORTS
-    # --------------------------------------------------------
+    # ========================================================
 
     current = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
             models.DiseaseReport.taluk_id.in_(
                 taluk_ids or [-1]
             ),
-            models.DiseaseReport.week_number == week,
+            models.DiseaseReport.week_number
+            == week,
         )
         .all()
     )
 
     previous = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
             models.DiseaseReport.taluk_id.in_(
                 taluk_ids or [-1]
@@ -259,7 +310,9 @@ def overview(
         for report in current
     }
 
-    active_agents = len(agents)
+    active_agents = len(
+        agents
+    )
 
     submitted_agents = sum(
         1
@@ -269,7 +322,8 @@ def overview(
 
     pending = max(
         0,
-        active_agents - submitted_agents,
+        active_agents
+        - submitted_agents,
     )
 
     coverage = (
@@ -282,42 +336,57 @@ def overview(
         else 0
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # DISEASE CASE TOTALS
-    # --------------------------------------------------------
+    # ========================================================
 
     current_by_disease = {}
     previous_by_disease = {}
 
     for report in current:
-        current_by_disease[report.disease] = (
+
+        current_by_disease[
+            report.disease
+        ] = (
             current_by_disease.get(
                 report.disease,
                 0,
             )
-            + (report.cases or 0)
+            + (
+                report.cases
+                or 0
+            )
         )
 
     for report in previous:
-        previous_by_disease[report.disease] = (
+
+        previous_by_disease[
+            report.disease
+        ] = (
             previous_by_disease.get(
                 report.disease,
                 0,
             )
-            + (report.cases or 0)
+            + (
+                report.cases
+                or 0
+            )
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # PREDICTIONS
-    # --------------------------------------------------------
+    # ========================================================
 
     predictions = (
-        db.query(models.Prediction)
+        db.query(
+            models.Prediction
+        )
         .filter(
             models.Prediction.taluk_id.in_(
                 taluk_ids or [-1]
             ),
-            models.Prediction.week_number == week,
+            models.Prediction.week_number
+            == week,
         )
         .all()
     )
@@ -332,8 +401,11 @@ def overview(
     risk_by_disease = {}
 
     for prediction in predictions:
-        current_risk = risk_by_disease.get(
-            prediction.disease
+
+        current_risk = (
+            risk_by_disease.get(
+                prediction.disease
+            )
         )
 
         if (
@@ -346,33 +418,44 @@ def overview(
                 0,
             )
         ):
+
             risk_by_disease[
                 prediction.disease
             ] = prediction.risk_level
 
-    # --------------------------------------------------------
+    # ========================================================
     # DISEASE OVERVIEW
-    # --------------------------------------------------------
+    # ========================================================
 
     diseases = sorted(
-        set(current_by_disease)
-        | set(previous_by_disease)
+        set(
+            current_by_disease
+        )
+        | set(
+            previous_by_disease
+        )
     )
 
     disease_overview = []
 
     for disease in diseases:
-        current_cases = current_by_disease.get(
-            disease,
-            0,
+
+        current_cases = (
+            current_by_disease.get(
+                disease,
+                0,
+            )
         )
 
-        previous_cases = previous_by_disease.get(
-            disease,
-            0,
+        previous_cases = (
+            previous_by_disease.get(
+                disease,
+                0,
+            )
         )
 
         if previous_cases:
+
             change = round(
                 (
                     current_cases
@@ -381,23 +464,35 @@ def overview(
                 / previous_cases
                 * 100
             )
+
         else:
+
             change = (
                 100
                 if current_cases
                 else 0
             )
 
-        risk = risk_by_disease.get(
-            disease,
-            "Low",
+        risk = (
+            risk_by_disease.get(
+                disease,
+                "Low",
+            )
         )
 
-        if risk in ("High", "Critical"):
+        if risk in (
+            "High",
+            "Critical",
+        ):
+
             status = "Watch"
+
         elif risk == "Moderate":
+
             status = "Monitor"
+
         else:
+
             status = "Stable"
 
         disease_overview.append(
@@ -418,15 +513,18 @@ def overview(
         reverse=True,
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # HIGH RISK ALERTS
-    # --------------------------------------------------------
+    # ========================================================
 
     high_risk = [
         prediction
         for prediction in predictions
         if prediction.risk_level
-        in ("High", "Critical")
+        in (
+            "High",
+            "Critical",
+        )
     ]
 
     high_risk.sort(
@@ -435,7 +533,8 @@ def overview(
                 prediction.risk_level,
                 0,
             ),
-            prediction.predicted_cases or 0,
+            prediction.predicted_cases
+            or 0,
         ),
         reverse=True,
     )
@@ -443,8 +542,11 @@ def overview(
     recent_alerts = []
 
     for prediction in high_risk[:4]:
+
         taluk = (
-            db.query(models.Taluk)
+            db.query(
+                models.Taluk
+            )
             .filter(
                 models.Taluk.id
                 == prediction.taluk_id
@@ -475,18 +577,22 @@ def overview(
                     f"Trend: "
                     f"{(
                         prediction.trend
-                        or 'stable'
+                        or "stable"
                     ).lower()}."
                 ),
-                "created_at": prediction.created_at,
+                "created_at": (
+                    prediction.created_at
+                ),
                 "taluk_name": place,
-                "disease": prediction.disease,
+                "disease": (
+                    prediction.disease
+                ),
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # EMERGING DISEASE REVIEWS
-    # --------------------------------------------------------
+    # ========================================================
 
     emerging_count = (
         db.query(
@@ -503,6 +609,7 @@ def overview(
     )
 
     if pending:
+
         recent_alerts.append(
             {
                 "type": "reporting",
@@ -524,6 +631,7 @@ def overview(
         )
 
     if emerging_count:
+
         recent_alerts.append(
             {
                 "type": "emerging",
@@ -544,13 +652,14 @@ def overview(
             }
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SURVEILLANCE PULSE
-    # --------------------------------------------------------
+    # ========================================================
 
     latest_report = None
 
     if current:
+
         latest_report = max(
             current,
             key=lambda report: (
@@ -568,6 +677,7 @@ def overview(
     pulse = []
 
     if latest_report:
+
         agent_name = (
             latest_report.agent.user.full_name
             if latest_report.agent
@@ -583,8 +693,12 @@ def overview(
 
         pulse.append(
             {
-                "time": latest_report.created_at,
-                "title": "Disease report submitted",
+                "time": (
+                    latest_report.created_at
+                ),
+                "title": (
+                    "Disease report submitted"
+                ),
                 "detail": (
                     f"{agent_name} submitted "
                     f"{latest_report.disease} "
@@ -599,8 +713,11 @@ def overview(
         )
 
     if latest_risk:
+
         taluk = (
-            db.query(models.Taluk)
+            db.query(
+                models.Taluk
+            )
             .filter(
                 models.Taluk.id
                 == latest_risk.taluk_id
@@ -610,8 +727,12 @@ def overview(
 
         pulse.append(
             {
-                "time": latest_risk.created_at,
-                "title": "Risk level updated",
+                "time": (
+                    latest_risk.created_at
+                ),
+                "title": (
+                    "Risk level updated"
+                ),
                 "detail": (
                     f"{latest_risk.disease} "
                     f"classified as "
@@ -634,18 +755,23 @@ def overview(
                 if latest_report
                 else now
             ),
-            "title": "Weekly reporting coverage",
+            "title": (
+                "Weekly reporting coverage"
+            ),
             "detail": (
                 f"{submitted_agents} of "
                 f"{active_agents} active monitored "
                 "agents have submitted this week."
             ),
-            "meta": f"{coverage}% coverage",
+            "meta": (
+                f"{coverage}% coverage"
+            ),
             "kind": "coverage",
         }
     )
 
     if emerging_count:
+
         pulse.append(
             {
                 "time": now,
@@ -661,12 +787,14 @@ def overview(
             }
         )
 
-    # --------------------------------------------------------
-    # OVERVIEW RESPONSE
-    # --------------------------------------------------------
+    # ========================================================
+    # ALL DISTRICT REPORTS
+    # ========================================================
 
     all_district_reports = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
             models.DiseaseReport.taluk_id.in_(
                 taluk_ids or [-1]
@@ -675,14 +803,22 @@ def overview(
         .all()
     )
 
+    # ========================================================
+    # OVERVIEW RESPONSE
+    # ========================================================
+
     return {
         "current_week": week,
+
         "current_week_label": (
             f"Week {week % 100}"
         ),
+
         "previous_week": previous_week,
 
-        "supervisor_name": user.full_name,
+        "supervisor_name": (
+            user.full_name
+        ),
 
         "supervisor_district": {
             "id": district.id,
@@ -695,17 +831,29 @@ def overview(
         },
 
         "total_agents": active_agents,
+
         "active_agents": active_agents,
-        "total_taluks": len(taluk_ids),
+
+        "total_taluks": len(
+            taluk_ids
+        ),
+
         "total_reports": len(
             all_district_reports
         ),
 
-        "reports_this_week": len(current),
+        "reports_this_week": len(
+            current
+        ),
+
         "submitted_agents_this_week": (
             submitted_agents
         ),
-        "pending_agent_submissions": pending,
+
+        "pending_agent_submissions": (
+            pending
+        ),
+
         "pending_emerging_reviews": (
             emerging_count
         ),
@@ -745,10 +893,18 @@ def overview(
             high_risk
         ),
 
-        "reporting_coverage_percent": coverage,
+        "reporting_coverage_percent": (
+            coverage
+        ),
 
-        "coverage_received": submitted_agents,
-        "coverage_pending": pending,
+        "coverage_received": (
+            submitted_agents
+        ),
+
+        "coverage_pending": (
+            pending
+        ),
+
         "coverage_no_report": 0,
 
         "locations": [
@@ -766,11 +922,17 @@ def overview(
 
         "selected_location": None,
 
-        "disease_overview": disease_overview,
+        "disease_overview": (
+            disease_overview
+        ),
 
-        "recent_alerts": recent_alerts[:5],
+        "recent_alerts": (
+            recent_alerts[:5]
+        ),
 
-        "surveillance_pulse": pulse[:4],
+        "surveillance_pulse": (
+            pulse[:4]
+        ),
 
         "updated_at": now,
     }
@@ -793,19 +955,29 @@ def reports(
     db: Session = Depends(get_db),
     user: models.User = Depends(supervisor_only),
 ):
-    ensure_disease_report_review_columns(db)
+    ensure_disease_report_review_columns(
+        db
+    )
 
     district, taluk_ids = district_taluk_ids(
         db,
         user,
     )
 
-    allowed_taluks = set(taluk_ids)
+    allowed_taluks = set(
+        taluk_ids
+    )
+
+    # ========================================================
+    # TALUK VALIDATION
+    # ========================================================
 
     if (
         taluk_id is not None
-        and taluk_id not in allowed_taluks
+        and taluk_id
+        not in allowed_taluks
     ):
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -815,7 +987,9 @@ def reports(
         )
 
     query = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
             models.DiseaseReport.taluk_id.in_(
                 taluk_ids or [-1]
@@ -823,47 +997,74 @@ def reports(
         )
     )
 
+    # ========================================================
+    # TALUK FILTER
+    # ========================================================
+
     if taluk_id is not None:
+
         query = query.filter(
             models.DiseaseReport.taluk_id
             == taluk_id
         )
 
+    # ========================================================
+    # DISEASE FILTER
+    # ========================================================
+
     if disease:
+
         query = query.filter(
             models.DiseaseReport.disease
             == disease
         )
 
+    # ========================================================
+    # WEEK FILTER
+    # ========================================================
+
     if week_number is not None:
+
         if week_number <= 53:
+
             query = query.filter(
                 models.DiseaseReport.week_number
                 % 100
                 == week_number
             )
+
         else:
+
             query = query.filter(
                 models.DiseaseReport.week_number
                 == week_number
             )
 
+    # ========================================================
+    # YEAR FILTER
+    # ========================================================
+
     if year is not None:
+
         query = query.filter(
             models.DiseaseReport.year
             == year
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # START DATE
-    # --------------------------------------------------------
+    # ========================================================
 
     if start_date:
+
         try:
+
             start_dt = datetime.fromisoformat(
                 start_date
             )
+
         except ValueError:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -877,19 +1078,23 @@ def reports(
             >= start_dt
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # END DATE
-    # --------------------------------------------------------
+    # ========================================================
 
     if end_date:
+
         try:
+
             end_dt = (
                 datetime.fromisoformat(
                     end_date
                 )
                 + timedelta(days=1)
             )
+
         except ValueError:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -903,8 +1108,15 @@ def reports(
             < end_dt
         )
 
+    # ========================================================
+    # SAFE LIMIT
+    # ========================================================
+
     safe_limit = min(
-        max(limit, 1),
+        max(
+            limit,
+            1,
+        ),
         1000,
     )
 
@@ -913,13 +1125,20 @@ def reports(
         .order_by(
             models.DiseaseReport.created_at.desc()
         )
-        .limit(safe_limit)
+        .limit(
+            safe_limit
+        )
         .all()
     )
 
     result = []
 
+    # ========================================================
+    # SERIALIZE REPORTS
+    # ========================================================
+
     for report in rows:
+
         agent_name = (
             report.agent.user.full_name
             if report.agent
@@ -934,21 +1153,34 @@ def reports(
         )
 
         cases = int(
-            report.cases or 0
+            report.cases
+            or 0
         )
 
         severity = (
-            report.severity or ""
+            report.severity
+            or ""
         ).strip()
 
         if severity:
+
             priority = severity.title()
+
         elif cases >= 25:
+
             priority = "High"
+
         elif cases >= 10:
+
             priority = "Medium"
+
         else:
+
             priority = "Low"
+
+        # ----------------------------------------------------
+        # REVIEW DATA
+        # ----------------------------------------------------
 
         review_row = db.execute(
             text(
@@ -962,59 +1194,97 @@ def reports(
                 WHERE id = :report_id
                 """
             ),
-            {"report_id": report.id},
+            {
+                "report_id": report.id
+            },
         ).fetchone()
 
         raw_status = (
             review_row[0]
-            if review_row and review_row[0]
+            if (
+                review_row
+                and review_row[0]
+            )
             else "PENDING_REVIEW"
         )
 
         status_labels = {
-            "PENDING_REVIEW": "Pending Review",
+            "PENDING_REVIEW": (
+                "Pending Review"
+            ),
             "APPROVED": "Approved",
             "REJECTED": "Rejected",
         }
 
-        report_status = status_labels.get(
-            raw_status,
-            "Pending Review",
+        report_status = (
+            status_labels.get(
+                raw_status,
+                "Pending Review",
+            )
         )
+
+        # ----------------------------------------------------
+        # STATUS FILTER
+        # ----------------------------------------------------
 
         if (
             status
             and status.lower()
             != report_status.lower()
         ):
+
             continue
 
         result.append(
             {
                 "id": report.id,
+
                 "report_id": (
                     f"RPT-{report.id:04d}"
                 ),
 
-                "agent_id": report.agent_id,
-                "agent_name": agent_name,
+                "agent_id": (
+                    report.agent_id
+                ),
 
-                "taluk_id": report.taluk_id,
-                "taluk_name": taluk_name,
+                "agent_name": (
+                    agent_name
+                ),
 
-                "district_id": district.id,
-                "district_name": district.name,
+                "taluk_id": (
+                    report.taluk_id
+                ),
 
-                "disease": report.disease,
+                "taluk_name": (
+                    taluk_name
+                ),
+
+                "district_id": (
+                    district.id
+                ),
+
+                "district_name": (
+                    district.name
+                ),
+
+                "disease": (
+                    report.disease
+                ),
+
                 "cases": cases,
 
                 "severity": (
-                    severity or None
+                    severity
+                    or None
                 ),
 
-                "priority": priority,
+                "priority": (
+                    priority
+                ),
 
-                "remarks": report.remarks,
+                "remarks": (
+                    report.remarks
+                ),
 
                 "preventive_measures": (
                     report.preventive_measures
@@ -1024,7 +1294,9 @@ def reports(
                     report.week_number
                 ),
 
-                "year": report.year,
+                "year": (
+                    report.year
+                ),
 
                 "created_at": (
                     report.created_at
@@ -1034,18 +1306,26 @@ def reports(
                     report.updated_at
                 ),
 
-                "status": report_status,
-                "review_status": raw_status,
+                "status": (
+                    report_status
+                ),
+
+                "review_status": (
+                    raw_status
+                ),
+
                 "review_notes": (
                     review_row[1]
                     if review_row
                     else None
                 ),
+
                 "reviewed_by": (
                     review_row[2]
                     if review_row
                     else None
                 ),
+
                 "reviewed_at": (
                     review_row[3]
                     if review_row
@@ -1070,25 +1350,36 @@ def create_medical_report(
     """
     Create a disease report from the Medical Supervisor portal.
 
-    The supervisor can only create reports for agents
-    belonging to the assigned district.
+    The supervisor can only create reports for agents belonging
+    to the assigned district.
     """
 
-    ensure_disease_report_review_columns(db)
+    ensure_disease_report_review_columns(
+        db
+    )
 
     _, allowed_taluk_ids = district_taluk_ids(
         db,
         user,
     )
 
+    # ========================================================
+    # AGENT ID
+    # ========================================================
+
     try:
+
         agent_id = int(
-            payload.get("agent_id")
+            payload.get(
+                "agent_id"
+            )
         )
+
     except (
         TypeError,
         ValueError,
     ):
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1096,17 +1387,30 @@ def create_medical_report(
             ),
         )
 
+    # ========================================================
+    # DISEASE
+    # ========================================================
+
     disease = str(
-        payload.get("disease") or ""
+        payload.get(
+            "disease"
+        )
+        or ""
     ).strip()
 
     if not disease:
+
         raise HTTPException(
             status_code=400,
             detail="Disease is required.",
         )
 
+    # ========================================================
+    # CASES
+    # ========================================================
+
     try:
+
         cases = max(
             0,
             int(
@@ -1116,10 +1420,12 @@ def create_medical_report(
                 )
             ),
         )
+
     except (
         TypeError,
         ValueError,
     ):
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1128,8 +1434,14 @@ def create_medical_report(
             ),
         )
 
+    # ========================================================
+    # FIND AGENT
+    # ========================================================
+
     agent = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .filter(
             models.Agent.id
             == agent_id
@@ -1138,15 +1450,21 @@ def create_medical_report(
     )
 
     if not agent:
+
         raise HTTPException(
             status_code=404,
             detail="Agent not found.",
         )
 
+    # ========================================================
+    # DISTRICT SECURITY
+    # ========================================================
+
     if (
         agent.taluk_id
         not in allowed_taluk_ids
     ):
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -1157,43 +1475,69 @@ def create_medical_report(
 
     now = datetime.utcnow()
 
+    # ========================================================
+    # WEEK
+    # ========================================================
+
     week = payload.get(
         "week_number"
     )
+
+    # ========================================================
+    # YEAR
+    # ========================================================
 
     year = payload.get(
         "year"
     )
 
     try:
+
         week = (
             int(week)
             if week is not None
-            else current_week_number(now)
+            else current_week_number(
+                now
+            )
         )
+
     except (
         TypeError,
         ValueError,
     ):
-        week = current_week_number(now)
+
+        week = current_week_number(
+            now
+        )
 
     try:
+
         year = (
             int(year)
             if year is not None
             else now.year
         )
+
     except (
         TypeError,
         ValueError,
     ):
+
         year = now.year
+
+    # ========================================================
+    # CREATE REPORT
+    # ========================================================
 
     report = models.DiseaseReport(
         agent_id=agent.id,
+
         taluk_id=agent.taluk_id,
+
         disease=disease,
+
         cases=cases,
+
         severity=(
             str(
                 payload.get(
@@ -1203,6 +1547,7 @@ def create_medical_report(
             ).strip()
             or None
         ),
+
         remarks=(
             str(
                 payload.get(
@@ -1212,6 +1557,7 @@ def create_medical_report(
             ).strip()
             or None
         ),
+
         preventive_measures=(
             str(
                 payload.get(
@@ -1221,26 +1567,41 @@ def create_medical_report(
             ).strip()
             or None
         ),
+
         week_number=week,
+
         year=year,
+
         created_at=now,
+
         updated_at=now,
     )
 
-    db.add(report)
+    db.add(
+        report
+    )
+
     db.commit()
-    db.refresh(report)
+
+    db.refresh(
+        report
+    )
 
     return {
         "id": report.id,
+
         "report_id": (
             f"RPT-{report.id:04d}"
         ),
+
         "message": (
             "Disease report created "
             "successfully."
         ),
-        "status": "Pending Review",
+
+        "status": (
+            "Pending Review"
+        ),
     }
 
 
@@ -1248,7 +1609,9 @@ def create_medical_report(
 # REVIEW NORMAL DISEASE REPORT
 # ============================================================
 
-@router.put("/reports/{report_id}/review")
+@router.put(
+    "/reports/{report_id}/review"
+)
 def review_disease_report(
     report_id: int,
     payload: dict,
@@ -1258,10 +1621,13 @@ def review_disease_report(
     """
     Approve, reject, or keep a normal disease report pending.
 
-    Review status is stored in the existing SQLite database so the
-    decision survives page refreshes and backend restarts.
+    Review status is stored in the existing SQLite database so
+    the decision survives page refreshes and backend restarts.
     """
-    ensure_disease_report_review_columns(db)
+
+    ensure_disease_report_review_columns(
+        db
+    )
 
     _, taluk_ids = district_taluk_ids(
         db,
@@ -1269,20 +1635,34 @@ def review_disease_report(
     )
 
     report = (
-        db.query(models.DiseaseReport)
+        db.query(
+            models.DiseaseReport
+        )
         .filter(
-            models.DiseaseReport.id == report_id
+            models.DiseaseReport.id
+            == report_id
         )
         .first()
     )
 
     if not report:
+
         raise HTTPException(
             status_code=404,
-            detail="Disease report not found.",
+            detail=(
+                "Disease report not found."
+            ),
         )
 
-    if report.taluk_id not in taluk_ids:
+    # ========================================================
+    # DISTRICT SECURITY
+    # ========================================================
+
+    if (
+        report.taluk_id
+        not in taluk_ids
+    ):
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -1292,26 +1672,45 @@ def review_disease_report(
         )
 
     decision = str(
-        payload.get("decision") or ""
+        payload.get(
+            "decision"
+        )
+        or ""
     ).strip().upper()
 
     review_notes = str(
-        payload.get("review_notes") or ""
+        payload.get(
+            "review_notes"
+        )
+        or ""
     ).strip()
 
     decision_map = {
         "APPROVE": "APPROVED",
         "APPROVED": "APPROVED",
+
         "REJECT": "REJECTED",
         "REJECTED": "REJECTED",
-        "KEEP_PENDING": "PENDING_REVIEW",
-        "PENDING": "PENDING_REVIEW",
-        "PENDING_REVIEW": "PENDING_REVIEW",
+
+        "KEEP_PENDING": (
+            "PENDING_REVIEW"
+        ),
+
+        "PENDING": (
+            "PENDING_REVIEW"
+        ),
+
+        "PENDING_REVIEW": (
+            "PENDING_REVIEW"
+        ),
     }
 
-    new_status = decision_map.get(decision)
+    new_status = decision_map.get(
+        decision
+    )
 
     if not new_status:
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -1336,12 +1735,30 @@ def review_disease_report(
             """
         ),
         {
-            "review_status": new_status,
-            "review_notes": review_notes or None,
-            "reviewed_by": user.id,
-            "reviewed_at": now,
-            "updated_at": now,
-            "report_id": report_id,
+            "review_status": (
+                new_status
+            ),
+
+            "review_notes": (
+                review_notes
+                or None
+            ),
+
+            "reviewed_by": (
+                user.id
+            ),
+
+            "reviewed_at": (
+                now
+            ),
+
+            "updated_at": (
+                now
+            ),
+
+            "report_id": (
+                report_id
+            ),
         },
     )
 
@@ -1350,20 +1767,46 @@ def review_disease_report(
     status_label = {
         "APPROVED": "Approved",
         "REJECTED": "Rejected",
-        "PENDING_REVIEW": "Pending Review",
-    }[new_status]
+        "PENDING_REVIEW": (
+            "Pending Review"
+        ),
+    }[
+        new_status
+    ]
 
     return {
         "ok": True,
+
         "id": report.id,
-        "report_id": f"RPT-{report.id:04d}",
-        "status": status_label,
-        "review_status": new_status,
-        "review_notes": review_notes or None,
-        "reviewed_by": user.id,
-        "reviewed_at": now,
+
+        "report_id": (
+            f"RPT-{report.id:04d}"
+        ),
+
+        "status": (
+            status_label
+        ),
+
+        "review_status": (
+            new_status
+        ),
+
+        "review_notes": (
+            review_notes
+            or None
+        ),
+
+        "reviewed_by": (
+            user.id
+        ),
+
+        "reviewed_at": (
+            now
+        ),
+
         "message": (
-            f"Report marked as {status_label}."
+            f"Report marked as "
+            f"{status_label}."
         ),
     }
 
@@ -1379,26 +1822,164 @@ def monitoring(
     user: models.User = Depends(supervisor_only),
 ):
     """
-    Return reporting status for every agent in the
-    Medical Supervisor's assigned district.
+    Return weekly reporting compliance for every active agent
+    in the Medical Supervisor's assigned district.
 
-    If week_number is not supplied, the current week
-    is used.
+    The Medical Supervisor UI is week-based.
+
+    When no week is supplied, the endpoint returns the last
+    completed ISO week rather than the currently open week.
+
+    A weekly report is considered due by Wednesday 23:59:59
+    of the reporting week.
+
+    Status values:
+
+        On Time
+            Report submitted on or before Wednesday deadline.
+
+        Late
+            Report submitted after Wednesday deadline.
+
+        Pending
+            Selected week is still open and the deadline has
+            not passed yet.
+
+        Missed
+            Selected week is complete and no report was submitted.
+
+    The response also contains the previous eight ISO weeks so
+    the frontend can render agent compliance history.
     """
 
-    _, taluk_ids = district_taluk_ids(
+    # ========================================================
+    # DISTRICT
+    # ========================================================
+
+    district, taluk_ids = district_taluk_ids(
         db,
         user,
     )
 
-    week = (
-        week_number
-        if week_number is not None
-        else current_week_number()
+    now = datetime.utcnow()
+
+    # ========================================================
+    # SELECT WEEK
+    # ========================================================
+
+    if week_number is None:
+
+        # ----------------------------------------------------
+        # DEFAULT TO LAST COMPLETED WEEK
+        # ----------------------------------------------------
+
+        selected_date = (
+            now
+            - timedelta(days=7)
+        )
+
+        iso = (
+            selected_date.isocalendar()
+        )
+
+        selected_week = (
+            iso.year * 100
+            + iso.week
+        )
+
+    else:
+
+        try:
+
+            selected_week = int(
+                week_number
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "week_number must be a valid "
+                    "ISO week number in YYYYWW format."
+                ),
+            )
+
+    # ========================================================
+    # SPLIT YYYYWW
+    # ========================================================
+
+    selected_year = (
+        selected_week // 100
     )
 
+    selected_iso_week = (
+        selected_week % 100
+    )
+
+    # ========================================================
+    # VALIDATE ISO WEEK
+    # ========================================================
+
+    try:
+
+        week_start = (
+            datetime.fromisocalendar(
+                selected_year,
+                selected_iso_week,
+                1,
+            )
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid ISO week number."
+            ),
+        )
+
+    # ========================================================
+    # WEEK END
+    # ========================================================
+
+    week_end = (
+        week_start
+        + timedelta(
+            days=6,
+            hours=23,
+            minutes=59,
+            seconds=59,
+        )
+    )
+
+    # ========================================================
+    # REPORT DEADLINE
+    # ========================================================
+
+    # Wednesday 23:59:59
+    due_at = (
+        week_start
+        + timedelta(
+            days=2,
+            hours=23,
+            minutes=59,
+            seconds=59,
+        )
+    )
+
+    # ========================================================
+    # ACTIVE AGENTS IN DISTRICT
+    # ========================================================
+
     agents = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .join(
             models.User,
             models.Agent.user_id
@@ -1407,7 +1988,8 @@ def monitoring(
         .filter(
             models.Agent.taluk_id.in_(
                 taluk_ids or [-1]
-            )
+            ),
+            models.User.is_active.is_(True),
         )
         .order_by(
             models.User.full_name.asc()
@@ -1415,119 +1997,481 @@ def monitoring(
         .all()
     )
 
+    # ========================================================
+    # BUILD PREVIOUS 8 WEEKS
+    #
+    # We use actual ISO dates rather than:
+    #
+    #     week - offset
+    #
+    # because YYYYWW arithmetic breaks at year boundaries.
+    # ========================================================
+
+    history_weeks = []
+
+    for offset in range(
+        7,
+        -1,
+        -1,
+    ):
+
+        history_date = (
+            week_start
+            - timedelta(
+                weeks=offset
+            )
+        )
+
+        history_iso = (
+            history_date.isocalendar()
+        )
+
+        history_week = (
+            history_iso.year * 100
+            + history_iso.week
+        )
+
+        history_weeks.append(
+            history_week
+        )
+
+    # ========================================================
+    # AGENT IDS
+    # ========================================================
+
+    agent_ids = [
+        agent.id
+        for agent in agents
+    ]
+
+    # ========================================================
+    # LOAD REPORTS FOR HISTORY
+    # ========================================================
+
+    reports = []
+
+    if agent_ids:
+
+        reports = (
+            db.query(
+                models.DiseaseReport
+            )
+            .filter(
+                models.DiseaseReport.agent_id.in_(
+                    agent_ids
+                ),
+
+                models.DiseaseReport.week_number.in_(
+                    history_weeks
+                ),
+            )
+            .order_by(
+                models.DiseaseReport.created_at.desc()
+            )
+            .all()
+        )
+
+    # ========================================================
+    # GROUP REPORTS BY AGENT / WEEK
+    # ========================================================
+
+    reports_by_agent = {}
+
+    for report in reports:
+
+        agent_reports = (
+            reports_by_agent.setdefault(
+                report.agent_id,
+                {},
+            )
+        )
+
+        # ----------------------------------------------------
+        # If multiple disease reports exist for the same
+        # agent/week, keep the latest report.
+        # ----------------------------------------------------
+
+        if (
+            report.week_number
+            not in agent_reports
+        ):
+
+            agent_reports[
+                report.week_number
+            ] = report
+
+    # ========================================================
+    # LAST SUBMISSION FOR EACH AGENT
+    # ========================================================
+
+    last_submission_by_agent = {}
+
+    if agent_ids:
+
+        latest_rows = (
+            db.query(
+                models.DiseaseReport.agent_id,
+
+                func.max(
+                    models.DiseaseReport.created_at
+                ),
+            )
+            .filter(
+                models.DiseaseReport.agent_id.in_(
+                    agent_ids
+                )
+            )
+            .group_by(
+                models.DiseaseReport.agent_id
+            )
+            .all()
+        )
+
+        last_submission_by_agent = {
+            agent_id: created_at
+            for (
+                agent_id,
+                created_at
+            ) in latest_rows
+        }
+
+    # ========================================================
+    # BUILD RESPONSE
+    # ========================================================
+
     rows = []
 
     for agent in agents:
 
-        # ----------------------------------------------------
-        # CURRENT WEEK REPORT
-        # ----------------------------------------------------
+        agent_reports = (
+            reports_by_agent.get(
+                agent.id,
+                {},
+            )
+        )
+
+        # ====================================================
+        # CURRENT SELECTED WEEK REPORT
+        # ====================================================
 
         current_report = (
-            db.query(models.DiseaseReport)
-            .filter(
-                models.DiseaseReport.agent_id
-                == agent.id,
-                models.DiseaseReport.week_number
-                == week,
+            agent_reports.get(
+                selected_week
             )
-            .order_by(
-                models.DiseaseReport.created_at.desc()
-            )
-            .first()
         )
 
         submitted = (
-            current_report is not None
+            current_report
+            is not None
         )
 
-        # ----------------------------------------------------
-        # LAST SUBMISSION
-        # ----------------------------------------------------
+        # ====================================================
+        # REPORTING STATUS
+        # ====================================================
 
-        last_submission = (
-            db.query(
-                models.DiseaseReport.created_at
+        if submitted:
+
+            report_created_at = (
+                current_report.created_at
             )
-            .filter(
-                models.DiseaseReport.agent_id
-                == agent.id
-            )
-            .order_by(
-                models.DiseaseReport.created_at.desc()
-            )
-            .first()
-        )
 
-        # ----------------------------------------------------
-        # LAST 8 WEEKS
-        # ----------------------------------------------------
+            if (
+                report_created_at
+                and report_created_at
+                <= due_at
+            ):
 
-        recent = []
+                status = "On Time"
 
-        for offset in range(
-            7,
-            -1,
-            -1,
-        ):
-            target_week = week - offset
+            else:
 
-            has_report = (
-                db.query(
-                    models.DiseaseReport.id
+                status = "Late"
+
+        else:
+
+            # ------------------------------------------------
+            # Future week
+            # ------------------------------------------------
+
+            if now < week_start:
+
+                status = "Pending"
+
+            # ------------------------------------------------
+            # Current week before Wednesday deadline
+            # ------------------------------------------------
+
+            elif (
+                week_start
+                <= now
+                <= due_at
+            ):
+
+                status = "Pending"
+
+            # ------------------------------------------------
+            # Deadline passed
+            # ------------------------------------------------
+
+            else:
+
+                status = "Missed"
+
+        # ====================================================
+        # HISTORY
+        # ====================================================
+
+        history = []
+
+        for history_week in history_weeks:
+
+            history_report = (
+                agent_reports.get(
+                    history_week
                 )
-                .filter(
-                    models.DiseaseReport.agent_id
-                    == agent.id,
-                    models.DiseaseReport.week_number
-                    == target_week,
+            )
+
+            history_year = (
+                history_week // 100
+            )
+
+            history_iso_week = (
+                history_week % 100
+            )
+
+            # ------------------------------------------------
+            # Calculate actual ISO week start.
+            # ------------------------------------------------
+
+            try:
+
+                history_start = (
+                    datetime.fromisocalendar(
+                        history_year,
+                        history_iso_week,
+                        1,
+                    )
                 )
-                .first()
-                is not None
+
+            except ValueError:
+
+                history_start = None
+
+            # ------------------------------------------------
+            # Calculate Wednesday deadline.
+            # ------------------------------------------------
+
+            if history_start is None:
+
+                history_due = None
+
+            else:
+
+                history_due = (
+                    history_start
+                    + timedelta(
+                        days=2,
+                        hours=23,
+                        minutes=59,
+                        seconds=59,
+                    )
+                )
+
+            # ------------------------------------------------
+            # Report exists
+            # ------------------------------------------------
+
+            if history_report is not None:
+
+                if (
+                    history_report.created_at
+                    and history_due
+                    and history_report.created_at
+                    <= history_due
+                ):
+
+                    history_status = (
+                        "On Time"
+                    )
+
+                else:
+
+                    history_status = (
+                        "Late"
+                    )
+
+                history.append(
+                    {
+                        "week_number": (
+                            history_week
+                        ),
+
+                        "year": (
+                            history_year
+                        ),
+
+                        "iso_week": (
+                            history_iso_week
+                        ),
+
+                        "submitted": True,
+
+                        "status": (
+                            history_status
+                        ),
+
+                        "submitted_at": (
+                            history_report.created_at
+                        ),
+
+                        "report_id": (
+                            history_report.id
+                        ),
+                    }
+                )
+
+                continue
+
+            # ------------------------------------------------
+            # No report exists
+            # ------------------------------------------------
+
+            if (
+                history_start
+                and now < history_start
+            ):
+
+                history_status = (
+                    "Pending"
+                )
+
+            elif (
+                history_start
+                and now
+                <= (
+                    history_start
+                    + timedelta(
+                        days=2,
+                        hours=23,
+                        minutes=59,
+                        seconds=59,
+                    )
+                )
+            ):
+
+                history_status = (
+                    "Pending"
+                )
+
+            else:
+
+                history_status = (
+                    "Missed"
+                )
+
+            history.append(
+                {
+                    "week_number": (
+                        history_week
+                    ),
+
+                    "year": (
+                        history_year
+                    ),
+
+                    "iso_week": (
+                        history_iso_week
+                    ),
+
+                    "submitted": False,
+
+                    "status": (
+                        history_status
+                    ),
+
+                    "submitted_at": None,
+
+                    "report_id": None,
+                }
             )
 
-            recent.append(
-                has_report
-            )
-
-        # ----------------------------------------------------
+        # ====================================================
         # MISSED STREAK
-        # ----------------------------------------------------
+        # ====================================================
 
         missed_streak = 0
 
-        for has_report in reversed(
-            recent
+        for item in reversed(
+            history
         ):
-            if has_report:
+
+            if (
+                item["status"]
+                == "Missed"
+            ):
+
+                missed_streak += 1
+
+            else:
+
                 break
 
-            missed_streak += 1
+        # ====================================================
+        # CURRENT REPORT DETAILS
+        # ====================================================
 
-        # ----------------------------------------------------
-        # REPORTING STATUS
-        # ----------------------------------------------------
+        current_report_date = (
+            current_report.created_at
+            if current_report
+            else None
+        )
 
-        if submitted:
-            status = "Submitted"
-        else:
-            status = "Pending"
+        current_disease = (
+            current_report.disease
+            if current_report
+            else None
+        )
+
+        current_cases = (
+            int(
+                current_report.cases
+                or 0
+            )
+            if current_report
+            else 0
+        )
+
+        current_severity = (
+            current_report.severity
+            if current_report
+            else None
+        )
+
+        # ====================================================
+        # RESPONSE ROW
+        # ====================================================
 
         rows.append(
             {
-                "agent_id": agent.id,
+                "agent_id": (
+                    agent.id
+                ),
+
                 "agent_name": (
                     agent.user.full_name
                     if agent.user
                     else "Unknown Agent"
                 ),
+
                 "username": (
                     agent.user.username
                     if agent.user
                     else ""
                 ),
 
-                "taluk_id": agent.taluk_id,
+                "taluk_id": (
+                    agent.taluk_id
+                ),
 
                 "taluk_name": (
                     agent.taluk.name
@@ -1535,11 +2479,12 @@ def monitoring(
                     else "Unknown Taluk"
                 ),
 
+                "district_id": (
+                    district.id
+                ),
+
                 "district_name": (
-                    agent.taluk.district.name
-                    if agent.taluk
-                    and agent.taluk.district
-                    else "Unknown District"
+                    district.name
                 ),
 
                 "is_active": bool(
@@ -1548,21 +2493,43 @@ def monitoring(
                     else False
                 ),
 
-                "submitted": submitted,
-
-                "status": status,
-
-                "week_number": week,
-
-                "last_submitted_at": (
-                    last_submission[0]
-                    if last_submission
-                    else None
+                "submitted": (
+                    submitted
                 ),
 
-                "missed_streak": missed_streak,
+                "status": (
+                    status
+                ),
 
-                "last_8_weeks": recent,
+                "week_number": (
+                    selected_week
+                ),
+
+                "year": (
+                    selected_year
+                ),
+
+                "iso_week": (
+                    selected_iso_week
+                ),
+
+                "week_start": (
+                    week_start
+                ),
+
+                "week_end": (
+                    week_end
+                ),
+
+                "due_at": (
+                    due_at
+                ),
+
+                "last_submitted_at": (
+                    last_submission_by_agent.get(
+                        agent.id
+                    )
+                ),
 
                 "current_report_id": (
                     current_report.id
@@ -1571,9 +2538,27 @@ def monitoring(
                 ),
 
                 "current_report_date": (
-                    current_report.created_at
-                    if current_report
-                    else None
+                    current_report_date
+                ),
+
+                "current_disease": (
+                    current_disease
+                ),
+
+                "current_cases": (
+                    current_cases
+                ),
+
+                "current_severity": (
+                    current_severity
+                ),
+
+                "missed_streak": (
+                    missed_streak
+                ),
+
+                "last_8_weeks": (
+                    history
                 ),
             }
         )
@@ -1597,7 +2582,10 @@ def analytics(
     )
 
     weeks = min(
-        max(weeks, 2),
+        max(
+            weeks,
+            2,
+        ),
         20,
     )
 
@@ -1616,15 +2604,21 @@ def analytics(
             models.DiseaseReport.year.desc(),
             models.DiseaseReport.week_number.desc(),
         )
-        .limit(weeks)
+        .limit(
+            weeks
+        )
         .all()
     )
 
     weekly = []
 
-    for year, week in reversed(
+    for (
+        year,
+        week,
+    ) in reversed(
         pairs
     ):
+
         total = (
             db.query(
                 func.coalesce(
@@ -1638,7 +2632,10 @@ def analytics(
                 models.DiseaseReport.taluk_id.in_(
                     taluk_ids or [-1]
                 ),
-                models.DiseaseReport.year == year,
+
+                models.DiseaseReport.year
+                == year,
+
                 models.DiseaseReport.week_number
                 == week,
             )
@@ -1647,20 +2644,33 @@ def analytics(
 
         weekly.append(
             {
-                "year": year,
-                "week_number": week,
+                "year": (
+                    year
+                ),
+
+                "week_number": (
+                    week
+                ),
+
                 "label": (
                     f"W{week % 100}"
                 ),
+
                 "total_cases": int(
-                    total or 0
+                    total
+                    or 0
                 ),
             }
         )
 
+    # ========================================================
+    # DISEASE TOTALS
+    # ========================================================
+
     totals = (
         db.query(
             models.DiseaseReport.disease,
+
             func.coalesce(
                 func.sum(
                     models.DiseaseReport.cases
@@ -1685,16 +2695,30 @@ def analytics(
     )
 
     return {
-        "weeks": weekly,
-        "weekly": weekly,
+        "weeks": (
+            weekly
+        ),
+
+        "weekly": (
+            weekly
+        ),
+
         "disease_totals": [
             {
-                "disease": disease,
+                "disease": (
+                    disease
+                ),
+
                 "cases": int(
-                    cases or 0
+                    cases
+                    or 0
                 ),
             }
-            for disease, cases in totals
+
+            for (
+                disease,
+                cases,
+            ) in totals
         ],
     }
 
@@ -1717,17 +2741,21 @@ def risk_map(
     week = current_week_number()
 
     query = (
-        db.query(models.Prediction)
+        db.query(
+            models.Prediction
+        )
         .filter(
             models.Prediction.taluk_id.in_(
                 taluk_ids or [-1]
             ),
+
             models.Prediction.week_number
             == week,
         )
     )
 
     if disease:
+
         query = query.filter(
             models.Prediction.disease
             == disease
@@ -1744,10 +2772,16 @@ def risk_map(
 
     grouped = {}
 
+    # ========================================================
+    # LOAD TALUKS
+    # ========================================================
+
     taluks = {
         taluk.id: taluk
         for taluk in (
-            db.query(models.Taluk)
+            db.query(
+                models.Taluk
+            )
             .filter(
                 models.Taluk.id.in_(
                     taluk_ids or [-1]
@@ -1757,7 +2791,12 @@ def risk_map(
         )
     }
 
+    # ========================================================
+    # GROUP PREDICTIONS
+    # ========================================================
+
     for prediction in rows:
+
         key = (
             prediction.taluk_id,
             prediction.disease,
@@ -1770,17 +2809,30 @@ def risk_map(
                 0,
             )
             > risk_rank.get(
-                grouped[key].risk_level,
+                grouped[
+                    key
+                ].risk_level,
                 0,
             )
         ):
-            grouped[key] = prediction
+
+            grouped[
+                key
+            ] = prediction
+
+    # ========================================================
+    # RESPONSE
+    # ========================================================
 
     return [
         {
-            "id": prediction.id,
+            "id": (
+                prediction.id
+            ),
 
-            "taluk_id": prediction.taluk_id,
+            "taluk_id": (
+                prediction.taluk_id
+            ),
 
             "taluk_name": (
                 taluks[
@@ -1814,7 +2866,9 @@ def risk_map(
                 else "Kodagu"
             ),
 
-            "disease": prediction.disease,
+            "disease": (
+                prediction.disease
+            ),
 
             "risk_level": (
                 prediction.risk_level
@@ -1856,7 +2910,9 @@ def risk_map(
                 prediction.created_at
             ),
         }
-        for prediction in grouped.values()
+
+        for prediction
+        in grouped.values()
     ]
 
 
@@ -1877,7 +2933,9 @@ def agents(
     week = current_week_number()
 
     rows = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .join(
             models.User,
             models.Agent.user_id
@@ -1897,6 +2955,7 @@ def agents(
     result = []
 
     for agent in rows:
+
         submitted = (
             db.query(
                 models.DiseaseReport.id
@@ -1904,6 +2963,7 @@ def agents(
             .filter(
                 models.DiseaseReport.agent_id
                 == agent.id,
+
                 models.DiseaseReport.week_number
                 == week,
             )
@@ -1913,9 +2973,17 @@ def agents(
 
         result.append(
             {
-                "id": agent.id,
-                "agent_id": agent.id,
-                "user_id": agent.user_id,
+                "id": (
+                    agent.id
+                ),
+
+                "agent_id": (
+                    agent.id
+                ),
+
+                "user_id": (
+                    agent.user_id
+                ),
 
                 "name": (
                     agent.user.full_name
@@ -1935,7 +3003,9 @@ def agents(
                     else ""
                 ),
 
-                "taluk_id": agent.taluk_id,
+                "taluk_id": (
+                    agent.taluk_id
+                ),
 
                 "taluk_name": (
                     agent.taluk.name
@@ -1958,7 +3028,9 @@ def agents(
                     else False
                 ),
 
-                "submitted": submitted,
+                "submitted": (
+                    submitted
+                ),
             }
         )
 
@@ -1997,6 +3069,7 @@ def agent_issues(
     )
 
     if status:
+
         query = query.filter(
             models.AgentIssueReport.status
             == status
@@ -2012,9 +3085,13 @@ def agent_issues(
 
     return [
         {
-            "id": issue.id,
+            "id": (
+                issue.id
+            ),
 
-            "agent_id": issue.agent_id,
+            "agent_id": (
+                issue.agent_id
+            ),
 
             "agent_name": (
                 issue.agent.user.full_name
@@ -2036,22 +3113,35 @@ def agent_issues(
                 else "Unknown Taluk"
             ),
 
-            "issue_type": issue.issue_type,
+            "issue_type": (
+                issue.issue_type
+            ),
 
-            "severity": issue.severity,
+            "severity": (
+                issue.severity
+            ),
 
             "description": (
                 issue.description
             ),
 
-            "evidence": issue.evidence,
+            "evidence": (
+                issue.evidence
+            ),
 
-            "status": issue.status,
+            "status": (
+                issue.status
+            ),
 
-            "created_at": issue.created_at,
+            "created_at": (
+                issue.created_at
+            ),
 
-            "resolved_at": issue.reviewed_at,
+            "resolved_at": (
+                issue.reviewed_at
+            ),
         }
+
         for issue in issues
     ]
 
@@ -2063,23 +3153,42 @@ def agent_issues(
 @router.post("/agent-issues")
 async def create_agent_issue(
     agent_id: int = Form(...),
+
     issue_type: str = Form(...),
-    severity: str = Form("Medium"),
+
+    severity: str = Form(
+        "Medium"
+    ),
+
     description: str = Form(...),
-    evidence: str = Form(""),
+
+    evidence: str = Form(
+        ""
+    ),
+
     proof: Optional[
         list[UploadFile]
     ] = File(None),
+
     db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
+
+    user: models.User = Depends(
+        supervisor_only
+    ),
 ):
     _, taluk_ids = district_taluk_ids(
         db,
         user,
     )
 
+    # ========================================================
+    # AGENT
+    # ========================================================
+
     agent = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .filter(
             models.Agent.id
             == agent_id
@@ -2092,6 +3201,7 @@ async def create_agent_issue(
         or agent.taluk_id
         not in taluk_ids
     ):
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -2100,9 +3210,14 @@ async def create_agent_issue(
             ),
         )
 
+    # ========================================================
+    # SAVE PROOF FILES
+    # ========================================================
+
     proof_names = []
 
     if proof:
+
         upload_dir = (
             Path(__file__)
             .resolve()
@@ -2117,6 +3232,7 @@ async def create_agent_issue(
         )
 
         for file in proof:
+
             if (
                 not file
                 or not file.filename
@@ -2141,48 +3257,81 @@ async def create_agent_issue(
                 safe_name
             )
 
+    # ========================================================
+    # EVIDENCE
+    # ========================================================
+
     evidence_text = (
-        evidence or ""
+        evidence
+        or ""
     ).strip()
 
     if proof_names:
+
         evidence_text = (
             evidence_text
             + "\nProof files: "
-            + ", ".join(proof_names)
+            + ", ".join(
+                proof_names
+            )
         ).strip()
+
+    # ========================================================
+    # CREATE ISSUE
+    # ========================================================
 
     issue = (
         models.AgentIssueReport(
             agent_id=agent.id,
+
             supervisor_id=user.id,
+
             issue_type=(
                 issue_type.strip()
             ),
+
             severity=(
                 severity.strip()
             ),
+
             description=(
                 description.strip()
             ),
+
             evidence=(
                 evidence_text
                 or None
             ),
+
             status=(
                 "PENDING_ADMIN_REVIEW"
             ),
-            created_at=datetime.utcnow(),
+
+            created_at=(
+                datetime.utcnow()
+            ),
         )
     )
 
-    db.add(issue)
+    db.add(
+        issue
+    )
+
     db.commit()
-    db.refresh(issue)
+
+    db.refresh(
+        issue
+    )
 
     return {
-        "id": issue.id,
-        "status": issue.status,
+        "id": (
+            issue.id
+        ),
+
+        "status": (
+            issue.status
+        ),
+
         "message": (
             "Complaint and proof submitted "
             "to System Admin."
@@ -2194,7 +3343,9 @@ async def create_agent_issue(
 # REMIND AGENT
 # ============================================================
 
-@router.post("/agents/{agent_id}/remind")
+@router.post(
+    "/agents/{agent_id}/remind"
+)
 def remind_agent(
     agent_id: int,
     db: Session = Depends(get_db),
@@ -2206,7 +3357,9 @@ def remind_agent(
     )
 
     agent = (
-        db.query(models.Agent)
+        db.query(
+            models.Agent
+        )
         .filter(
             models.Agent.id
             == agent_id
@@ -2219,6 +3372,7 @@ def remind_agent(
         or agent.taluk_id
         not in taluk_ids
     ):
+
         raise HTTPException(
             status_code=403,
             detail=(
@@ -2227,26 +3381,48 @@ def remind_agent(
             ),
         )
 
-    notification = models.Notification(
-        title="Weekly report reminder",
-        message=(
-            "Your Medical Supervisor has "
-            "reminded you to submit your "
-            "weekly surveillance report."
-        ),
-        type="reporting",
-        taluk_id=agent.taluk_id,
-        created_at=datetime.utcnow(),
-        is_read=False,
+    notification = (
+        models.Notification(
+            title=(
+                "Weekly report reminder"
+            ),
+
+            message=(
+                "Your Medical Supervisor has "
+                "reminded you to submit your "
+                "weekly surveillance report."
+            ),
+
+            type="reporting",
+
+            taluk_id=(
+                agent.taluk_id
+            ),
+
+            created_at=(
+                datetime.utcnow()
+            ),
+
+            is_read=False,
+        )
     )
 
-    db.add(notification)
+    db.add(
+        notification
+    )
+
     db.commit()
 
     return {
         "ok": True,
-        "agent_id": agent_id,
-        "message": "Reminder sent.",
+
+        "agent_id": (
+            agent_id
+        ),
+
+        "message": (
+            "Reminder sent."
+        ),
     }
 
 
@@ -2277,10 +3453,16 @@ def emerging(
         )
     )
 
+    # ========================================================
+    # TALUK FILTER
+    # ========================================================
+
     if taluk_id is not None:
+
         if taluk_id not in set(
             taluk_ids
         ):
+
             raise HTTPException(
                 status_code=403,
                 detail=(
@@ -2294,7 +3476,12 @@ def emerging(
             == taluk_id
         )
 
+    # ========================================================
+    # STATUS FILTER
+    # ========================================================
+
     if status:
+
         query = query.filter(
             models.EmergingDiseaseReport.status
             == status
@@ -2310,11 +3497,17 @@ def emerging(
 
     return [
         {
-            "id": report.id,
+            "id": (
+                report.id
+            ),
 
-            "agent_id": report.agent_id,
+            "agent_id": (
+                report.agent_id
+            ),
 
-            "taluk_id": report.taluk_id,
+            "taluk_id": (
+                report.taluk_id
+            ),
 
             "taluk_name": (
                 report.taluk.name
@@ -2330,7 +3523,9 @@ def emerging(
                 report.suspected_cases
             ),
 
-            "symptoms": report.symptoms,
+            "symptoms": (
+                report.symptoms
+            ),
 
             "description": (
                 report.description
@@ -2340,7 +3535,9 @@ def emerging(
                 report.observed_date
             ),
 
-            "status": report.status,
+            "status": (
+                report.status
+            ),
 
             "mapped_disease_id": (
                 report.mapped_disease_id
@@ -2364,6 +3561,7 @@ def emerging(
                 report.reviewed_at
             ),
         }
+
         for report in rows
     ]
 
@@ -2377,9 +3575,14 @@ def emerging(
 )
 def review_emerging(
     report_id: int,
+
     payload: schemas.EmergingDiseaseReview,
+
     db: Session = Depends(get_db),
-    user: models.User = Depends(supervisor_only),
+
+    user: models.User = Depends(
+        supervisor_only
+    ),
 ):
     _, taluk_ids = district_taluk_ids(
         db,
@@ -2397,11 +3600,16 @@ def review_emerging(
         .first()
     )
 
+    # ========================================================
+    # DISTRICT SECURITY
+    # ========================================================
+
     if (
         not report
         or report.taluk_id
         not in taluk_ids
     ):
+
         raise HTTPException(
             status_code=404,
             detail=(
@@ -2415,13 +3623,14 @@ def review_emerging(
         or ""
     ).upper()
 
-    # --------------------------------------------------------
+    # ========================================================
     # VERIFY EXISTING DISEASE
-    # --------------------------------------------------------
+    # ========================================================
 
     if decision == "VERIFY_EXISTING":
 
         if not payload.mapped_disease_id:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -2431,7 +3640,9 @@ def review_emerging(
             )
 
         disease = (
-            db.query(models.Disease)
+            db.query(
+                models.Disease
+            )
             .filter(
                 models.Disease.id
                 == payload.mapped_disease_id
@@ -2440,6 +3651,7 @@ def review_emerging(
         )
 
         if not disease:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -2452,11 +3664,13 @@ def review_emerging(
             payload.mapped_disease_id
         )
 
-        report.status = "APPROVED"
+        report.status = (
+            "APPROVED"
+        )
 
-    # --------------------------------------------------------
+    # ========================================================
     # VERIFY NEW DISEASE
-    # --------------------------------------------------------
+    # ========================================================
 
     elif decision == "VERIFY_NEW":
 
@@ -2466,6 +3680,7 @@ def review_emerging(
         ).strip()
 
         if not name:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -2474,7 +3689,9 @@ def review_emerging(
             )
 
         disease = (
-            db.query(models.Disease)
+            db.query(
+                models.Disease
+            )
             .filter(
                 func.lower(
                     models.Disease.name
@@ -2485,43 +3702,69 @@ def review_emerging(
         )
 
         if not disease:
+
             disease = models.Disease(
                 name=name,
+
                 description=(
                     payload.new_disease_description
                 ),
+
                 verification_status=(
                     "VERIFIED"
                 ),
+
                 is_active=True,
-                verified_by_user_id=user.id,
-                verified_at=datetime.utcnow(),
+
+                verified_by_user_id=(
+                    user.id
+                ),
+
+                verified_at=(
+                    datetime.utcnow()
+                ),
             )
 
-            db.add(disease)
+            db.add(
+                disease
+            )
+
             db.flush()
 
         report.mapped_disease_id = (
             disease.id
         )
 
-        report.status = "APPROVED"
+        report.status = (
+            "APPROVED"
+        )
 
-    # --------------------------------------------------------
+    # ========================================================
     # REJECT
-    # --------------------------------------------------------
+    # ========================================================
 
     elif decision == "REJECT":
 
-        report.status = "REJECTED"
+        report.status = (
+            "REJECTED"
+        )
+
+    # ========================================================
+    # INVALID DECISION
+    # ========================================================
 
     else:
+
         raise HTTPException(
             status_code=400,
             detail=(
                 "Unsupported review decision."
             ),
         )
+
+    # ========================================================
+    # REVIEW DETAILS
+    # ========================================================
 
     report.review_notes = (
         payload.review_notes
@@ -2532,14 +3775,24 @@ def review_emerging(
     )
 
     db.commit()
-    db.refresh(report)
+
+    db.refresh(
+        report
+    )
 
     return {
-        "id": report.id,
-        "status": report.status,
+        "id": (
+            report.id
+        ),
+
+        "status": (
+            report.status
+        ),
+
         "mapped_disease_id": (
             report.mapped_disease_id
         ),
+
         "review_notes": (
             report.review_notes
         ),
