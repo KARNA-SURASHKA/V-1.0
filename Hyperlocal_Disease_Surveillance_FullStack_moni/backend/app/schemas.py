@@ -70,6 +70,59 @@ class AgentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AgentManagementOut(BaseModel):
+    id: int
+    username: str
+    full_name: str
+    taluk_id: int
+    taluk_name: Optional[str] = None
+    is_active: bool
+    this_week_count: int = 0
+    this_week_expected: int = 1
+    this_month_count: int = 0
+    this_month_expected: int = 1
+    compliance: int = 0
+    last_report_at: Optional[datetime] = None
+    reporting_status: str = "Missed"
+    review_label: str = "—"
+    attention: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AgentManagementStats(BaseModel):
+    total_agents: int
+    active_agents: int
+    reporting_this_week: int
+    needs_attention: int
+
+
+class AgentWarningIn(BaseModel):
+    message: str = Field(min_length=3, max_length=2000)
+
+
+class AgentDetailOut(BaseModel):
+    id: int
+    username: str
+    full_name: str
+    taluk_id: int
+    taluk_name: Optional[str] = None
+    is_active: bool
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    joined_date: Optional[datetime] = None
+    coverage_areas: int = 1
+    this_week_count: int = 0
+    this_week_expected: int = 1
+    this_month_count: int = 0
+    this_month_expected: int = 1
+    compliance: int = 0
+    pending_reviews: int = 0
+    attention: bool = False
+    latest_review: Optional[dict] = None
+    reporting_history: List[dict] = Field(default_factory=list)
+
+
 # ============================================================================
 # AGENT STATUS
 # ============================================================================

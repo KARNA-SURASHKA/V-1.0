@@ -98,28 +98,151 @@ def get_stats(
 
 @router.get(
     "/agents",
-    response_model=List[schemas.AgentOut],
+    response_model=List[schemas.AgentManagementOut],
 )
 def list_agents(
+    state_id: Optional[int] = None,
+    district_id: Optional[int] = None,
+    taluk_id: Optional[int] = None,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    reporting_status: Optional[str] = None,
+    assignment: Optional[str] = None,
     db: Session = Depends(get_db),
     user: models.User = Depends(admin_only),
 ):
-    agents = (
-        db.query(models.Agent)
-        .all()
+    week = current_week_number()
+    agents = db.query(models.Agent).join(models.User).join(models.Taluk).join(models.District).all()
+
+    rows = []
+    for a in agents:
+        district = a.taluk.district if a.taluk else None
+        state = district.state if district else None
+        if state_id and (not state or state.id != state_id): continue
+        if district_id and (not district or district.id != district_id): continue
+        if taluk_id and a.taluk_id != taluk_id: continue
+        if search:
+            q = search.strip().lower()
+            if q not in (a.user.full_name or "").lower() and q not in (a.user.username or "").lower() and q not in str(a.id): continue
+        if status == "Active" and not a.user.is_active: continue
+        if status == "Inactive" and a.user.is_active: continue
+        if assignment not in (None, "", "All", "All Locations") and (not a.taluk or a.taluk.name != assignment): continue
+
+        this_week = db.query(func.count(func.distinct(models.DiseaseReport.week_number))).filter(
+            models.DiseaseReport.agent_id == a.id,
+            models.DiseaseReport.week_number == week,
+        ).scalar() or 0
+        last_report = db.query(func.max(models.DiseaseReport.created_at)).filter(models.DiseaseReport.agent_id == a.id).scalar()
+        # One weekly submission is the real project reporting contract.
+        this_month = db.query(func.count(func.distinct(models.DiseaseReport.week_number))).filter(
+            models.DiseaseReport.agent_id == a.id,
+            models.DiseaseReport.created_at >= __import__('datetime').datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+        ).scalar() or 0
+        expected_month = max(1, min(5, (( __import__('datetime').datetime.utcnow().day - 1) // 7) + 1))
+        compliance = min(100, round((this_month / expected_month) * 100))
+        pending = db.query(models.AgentIssueReport).filter(models.AgentIssueReport.agent_id == a.id, models.AgentIssueReport.status == "PENDING_ADMIN_REVIEW").count()
+        latest_issue = db.query(models.AgentIssueReport).filter(models.AgentIssueReport.agent_id == a.id).order_by(models.AgentIssueReport.created_at.desc()).first()
+        reporting = "On Time" if this_week else "Missed"
+        if pending or (not this_week and a.user.is_active): reporting = "Needs Attention" if pending else "Missed"
+        if reporting_status not in (None, "", "All") and reporting != reporting_status: continue
+        review_label = "—"
+        if pending: review_label = f"{pending} Pending"
+        elif latest_issue and latest_issue.status == "APPROVED": review_label = "Recommendation"
+        elif latest_issue and latest_issue.status == "DISMISSED": review_label = "Resolved"
+        attention = bool(pending or (a.user.is_active and not this_week))
+        rows.append(schemas.AgentManagementOut(
+            id=a.id, username=a.user.username, full_name=a.user.full_name, taluk_id=a.taluk_id,
+            taluk_name=a.taluk.name if a.taluk else None, is_active=bool(a.user.is_active),
+            this_week_count=this_week, this_week_expected=1, this_month_count=this_month,
+            this_month_expected=expected_month, compliance=compliance, last_report_at=last_report,
+            reporting_status=reporting, review_label=review_label, attention=attention,
+        ))
+    return rows
+
+
+@router.get("/agents/stats", response_model=schemas.AgentManagementStats)
+def agent_management_stats(
+    state_id: Optional[int] = None,
+    district_id: Optional[int] = None,
+    taluk_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(admin_only),
+):
+    rows = list_agents(state_id, district_id, taluk_id, None, None, None, None, db, user)
+    return schemas.AgentManagementStats(
+        total_agents=len(rows),
+        active_agents=sum(1 for r in rows if r.is_active),
+        reporting_this_week=sum(1 for r in rows if r.this_week_count > 0),
+        needs_attention=sum(1 for r in rows if r.attention),
     )
 
-    return [
-        schemas.AgentOut(
-            id=a.id,
-            username=a.user.username,
-            full_name=a.user.full_name,
-            taluk_id=a.taluk_id,
-            taluk_name=a.taluk.name,
-            is_active=bool(a.user.is_active),
-        )
-        for a in agents
-    ]
+
+@router.get("/agents/{agent_id}/details", response_model=schemas.AgentDetailOut)
+def agent_details(
+    agent_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(admin_only),
+):
+    from datetime import datetime as dt
+    agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    if not agent: raise HTTPException(status_code=404, detail="Agent not found")
+    week = current_week_number()
+    now = dt.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    this_week = db.query(func.count(func.distinct(models.DiseaseReport.week_number))).filter(models.DiseaseReport.agent_id == agent.id, models.DiseaseReport.week_number == week).scalar() or 0
+    this_month = db.query(func.count(func.distinct(models.DiseaseReport.week_number))).filter(models.DiseaseReport.agent_id == agent.id, models.DiseaseReport.created_at >= month_start).scalar() or 0
+    expected_month = max(1, min(5, ((now.day - 1) // 7) + 1))
+    compliance = min(100, round(this_month / expected_month * 100))
+    issues = db.query(models.AgentIssueReport).filter(models.AgentIssueReport.agent_id == agent.id).order_by(models.AgentIssueReport.created_at.desc()).all()
+    pending = sum(1 for i in issues if i.status == "PENDING_ADMIN_REVIEW")
+    latest = issues[0] if issues else None
+    joined = db.query(models.ActivityLog.created_at).filter(models.ActivityLog.action == "CREATE_AGENT", models.ActivityLog.details.ilike(f"%{agent.user.username}%")).order_by(models.ActivityLog.created_at.asc()).first()
+    if not joined:
+        joined = db.query(models.DiseaseReport.created_at).filter(models.DiseaseReport.agent_id == agent.id).order_by(models.DiseaseReport.created_at.asc()).first()
+    # Last 8 surveillance weeks visible in the detail panel.
+    history = []
+    current_iso = now.isocalendar()
+    current_w = current_iso.week
+    current_y = current_iso.year
+    for offset in range(7, -1, -1):
+        w = current_w - offset
+        y = current_y
+        while w <= 0:
+            y -= 1
+            w += dt(y, 12, 28).isocalendar().week
+        wn = y * 100 + w
+        submitted = db.query(models.DiseaseReport.id).filter(models.DiseaseReport.agent_id == agent.id, models.DiseaseReport.week_number == wn).first() is not None
+        history.append({"week_number": wn, "year": y, "submitted": submitted})
+    latest_dict = None
+    if latest:
+        latest_dict = {"id": latest.id, "issue_type": latest.issue_type, "severity": latest.severity, "description": latest.description, "evidence": latest.evidence, "status": latest.status, "created_at": latest.created_at, "reviewed_at": latest.reviewed_at}
+    return schemas.AgentDetailOut(
+        id=agent.id, username=agent.user.username, full_name=agent.user.full_name,
+        taluk_id=agent.taluk_id, taluk_name=agent.taluk.name if agent.taluk else None,
+        is_active=bool(agent.user.is_active), email=agent.user.username if "@" in agent.user.username else None,
+        phone=None, joined_date=joined[0] if joined else None, coverage_areas=1,
+        this_week_count=this_week, this_week_expected=1, this_month_count=this_month,
+        this_month_expected=expected_month, compliance=compliance, pending_reviews=pending,
+        attention=bool(pending or (agent.user.is_active and not this_week)), latest_review=latest_dict,
+        reporting_history=history,
+    )
+
+
+@router.get("/agents/{agent_id}/reports", response_model=List[schemas.ReportOut])
+def agent_reports(agent_id: int, db: Session = Depends(get_db), user: models.User = Depends(admin_only)):
+    if not db.query(models.Agent).filter(models.Agent.id == agent_id).first(): raise HTTPException(status_code=404, detail="Agent not found")
+    return db.query(models.DiseaseReport).filter(models.DiseaseReport.agent_id == agent_id).order_by(models.DiseaseReport.created_at.desc()).limit(100).all()
+
+
+@router.post("/agents/{agent_id}/warning")
+def issue_agent_warning(agent_id: int, payload: schemas.AgentWarningIn, db: Session = Depends(get_db), user: models.User = Depends(admin_only)):
+    agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+    if not agent: raise HTTPException(status_code=404, detail="Agent not found")
+    message = payload.message.strip()
+    db.add(models.Notification(title="Agent Warning", message=message, type="warning", taluk_id=agent.taluk_id))
+    create_activity_log(db, user, "ISSUE_AGENT_WARNING", f"Warning issued to agent '{agent.user.username}': {message}")
+    db.commit()
+    return {"detail": "Warning issued"}
 
 
 # ============================================================
@@ -1086,3 +1209,5 @@ def review_agent_issue(issue_id: int, payload: schemas.AgentIssueReview, db: Ses
         description=issue.description, evidence=issue.evidence, status=issue.status,
         admin_notes=issue.admin_notes, created_at=issue.created_at, reviewed_at=issue.reviewed_at
     )
+
+

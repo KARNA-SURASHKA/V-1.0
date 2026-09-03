@@ -1243,6 +1243,52 @@ const api = {
   },
 
   // ==========================================================
+  // AGENT MANAGEMENT
+  // ==========================================================
+
+  listAgents: async (params = {}) => {
+    return request("/admin/agents", { params });
+  },
+
+  createAgent: async (payload) => {
+    return request("/admin/agents", { method: "POST", body: payload });
+  },
+
+  updateAgent: async (agentId, payload) => {
+    return request(`/admin/agents/${agentId}`, { method: "PUT", body: payload });
+  },
+
+  updateAgentStatus: async (agentId, isActive) => {
+    return request(`/admin/agents/${agentId}/status`, {
+      method: "PATCH",
+      params: { is_active: isActive },
+    });
+  },
+
+  deleteAgent: async (agentId) => {
+    return request(`/admin/agents/${agentId}`, { method: "DELETE" });
+  },
+
+  getAgentManagementStats: async (params = {}) => {
+    return request("/admin/agents/stats", { params });
+  },
+
+  getAgentDetails: async (agentId) => {
+    return request(`/admin/agents/${agentId}/details`);
+  },
+
+  getAgentReports: async (agentId) => {
+    return request(`/admin/agents/${agentId}/reports`);
+  },
+
+  issueAgentWarning: async (agentId, message) => {
+    return request(`/admin/agents/${agentId}/warning`, {
+      method: "POST",
+      body: { message },
+    });
+  },
+
+  // ==========================================================
   // GENERIC
   // ==========================================================
 
