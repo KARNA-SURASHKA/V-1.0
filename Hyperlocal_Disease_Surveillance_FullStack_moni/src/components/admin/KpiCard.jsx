@@ -3,49 +3,88 @@ export default function KpiCard({
   value,
   icon: Icon,
   note,
+  trend,
   tone = "green",
 }) {
   const tones = {
-    green: "bg-[#0B7A33]/10 text-[#0B7A33]",
-    amber: "bg-[#E0A800]/10 text-[#9A7200]",
-    red: "bg-[#C62828]/10 text-[#C62828]",
-    slate: "bg-[#1F3144]/8 text-[#1F3144]",
+    green: {
+      background: "#EDF8F0",
+      color: "#087A32",
+    },
+
+    amber: {
+      background: "#FFF7E5",
+      color: "#C48700",
+    },
+
+    red: {
+      background: "#FFF0F0",
+      color: "#C62828",
+    },
+
+    blue: {
+      background: "#F0F4FF",
+      color: "#536CC8",
+    },
   };
 
+  const selected =
+    tones[tone] || tones.green;
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E8E2D8] p-5">
+    <div className="h-[114px] rounded-[12px] border border-[#E1E8E3] bg-white px-[15px] py-[13px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex h-full items-start gap-[11px]">
 
-        <div>
+        {/* ICON */}
 
-          <p className="text-[12px] text-[#7A8598]">
+        {Icon && (
+          <div
+            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full"
+            style={{
+              backgroundColor:
+                selected.background,
+              color: selected.color,
+            }}
+          >
+            <Icon
+              size={18}
+              strokeWidth={1.7}
+            />
+          </div>
+        )}
+
+        {/* CONTENT */}
+
+        <div className="min-w-0">
+
+          <p className="text-[8px] font-bold uppercase tracking-[0.05em] text-[#10243A]">
             {label}
           </p>
 
-          <p className="text-[29px] leading-none font-bold text-[#1F3144] mt-2">
+          <p className="mt-[5px] text-[24px] font-semibold leading-none tracking-[-0.025em] text-[#10243A]">
             {value}
           </p>
 
           {note && (
-            <p className="text-[11px] text-[#9A9489] mt-2">
+            <p className="mt-[5px] text-[8px] leading-[11px] text-[#52627D]">
               {note}
             </p>
           )}
 
-        </div>
+          {trend && (
+            <p
+              className="mt-[6px] text-[8px] font-semibold"
+              style={{
+                color:
+                  selected.color,
+              }}
+            >
+              {trend}
+            </p>
+          )}
 
-        {Icon && (
-          <div
-            className={`
-              w-10 h-10 rounded-xl
-              flex items-center justify-center
-              ${tones[tone] || tones.green}
-            `}
-          >
-            <Icon size={19} />
-          </div>
-        )}
+        </div>
 
       </div>
 

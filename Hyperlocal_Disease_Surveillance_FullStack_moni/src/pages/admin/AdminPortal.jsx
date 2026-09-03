@@ -1,19 +1,24 @@
 import { useMemo, useState } from "react";
 
 import {
-  LayoutDashboard,
+  Activity,
+  BarChart3,
+  Bell,
   ClipboardCheck,
   FileText,
+  LayoutDashboard,
+  Map,
   MapPinned,
-  Users,
-  BrainCircuit,
-  BellRing,
-  Settings,
   ScrollText,
+  Settings,
+  ShieldCheck,
+  UserCog,
+  UsersRound,
 } from "lucide-react";
 
 import AdminLayout from "./AdminLayout";
 import AdminDashboard from "./AdminDashboard";
+
 import AgentManagement from "./AgentManagement";
 import WeeklyMonitoring from "./WeeklyMonitoring";
 import DiseaseReports from "./DiseaseReports";
@@ -31,55 +36,64 @@ const NAV = [
   },
 
   {
-    section: "SURVEILLANCE",
+    section: "PEOPLE & ACCESS",
     items: [
+      {
+        key: "users",
+        label: "User Management",
+        icon: UsersRound,
+      },
+      {
+        key: "agents",
+        label: "Agent Management",
+        icon: UserCog,
+      },
+      {
+        key: "supervisors",
+        label: "Medical Supervisor Management",
+        icon: UserCog,
+      },
+      {
+        key: "roles",
+        label: "Roles & Permissions",
+        icon: ShieldCheck,
+      },
+    ],
+  },
+
+  {
+    section: "SURVEILLANCE DATA",
+    items: [
+      {
+        key: "reports",
+        label: "Report Management",
+        icon: FileText,
+      },
       {
         key: "monitoring",
         label: "Weekly Monitoring",
         icon: ClipboardCheck,
       },
       {
-        key: "reports",
-        label: "Disease Reports",
-        icon: FileText,
-      },
-      {
         key: "risk-map",
         label: "Risk Map",
         icon: MapPinned,
       },
-    ],
-  },
-
-  {
-    section: "MANAGEMENT",
-    items: [
       {
-        key: "agents",
-        label: "Agents",
-        icon: Users,
+        key: "analytics",
+        label: "Analytics",
+        icon: BarChart3,
       },
     ],
   },
 
   {
-    section: "PREDICTIONS",
+    section: "LOCATION",
     items: [
       {
-        key: "predictions",
-        label: "Prediction Management",
-        icon: BrainCircuit,
-      },
-    ],
-  },
-
-  {
-    section: "COMMUNICATION",
-    items: [
-      {
-        key: "notifications",
-        label: "Notifications",
-        icon: BellRing,
+        key: "location",
+        label: "Location Management",
+        icon: Map,
       },
     ],
   },
@@ -88,54 +102,55 @@ const NAV = [
     section: "SYSTEM",
     items: [
       {
-        key: "settings",
-        label: "Settings",
-        icon: Settings,
+        key: "health",
+        label: "System Health",
+        icon: Activity,
+      },
+      {
+        key: "notifications",
+        label: "Notifications",
+        icon: Bell,
       },
       {
         key: "activity",
         label: "Activity Logs",
         icon: ScrollText,
       },
+      {
+        key: "settings",
+        label: "Settings",
+        icon: Settings,
+      },
     ],
   },
 ];
 
-export default function AdminPortal({ onExit }) {
-  const [page, setPage] = useState("dashboard");
+export default function AdminPortal({
+  onExit,
+}) {
+  const [page, setPage] =
+    useState("dashboard");
 
-  const [location, setLocation] = useState({
-    state: null,
-    district: null,
-    taluk: null,
-  });
+  const [location, setLocation] =
+    useState({
+      state: null,
+      district: null,
+      taluk: null,
+    });
 
-  /*
-   * Convert the grouped NAV structure into one flat list
-   * so we can easily find the currently active page.
-   */
   const activePage = useMemo(() => {
-    const allItems = NAV.flatMap((group) =>
-      group.items || [group]
+    const items = NAV.flatMap(
+      (group) =>
+        group.items || [group]
     );
 
     return (
-      allItems.find((item) => item.key === page) ||
-      allItems[0]
+      items.find(
+        (item) => item.key === page
+      ) || items[0]
     );
   }, [page]);
 
-  /*
-   * Location selector updates this state.
-   * Every Admin page receives the same location context.
-   */
-  const handleLocationChange = (nextLocation) => {
-    setLocation(nextLocation);
-  };
-
-  /*
-   * Props shared with all Admin pages.
-   */
   const pageProps = {
     location,
     onNavigate: setPage,
@@ -144,52 +159,148 @@ export default function AdminPortal({ onExit }) {
   const renderPage = () => {
     switch (page) {
       case "dashboard":
-        return <AdminDashboard {...pageProps} />;
+        return (
+          <AdminDashboard
+            {...pageProps}
+          />
+        );
 
       case "agents":
-        return <AgentManagement {...pageProps} />;
+        return (
+          <AgentManagement
+            {...pageProps}
+          />
+        );
 
       case "monitoring":
-        return <WeeklyMonitoring {...pageProps} />;
+        return (
+          <WeeklyMonitoring
+            {...pageProps}
+          />
+        );
 
       case "reports":
-        return <DiseaseReports {...pageProps} />;
+        return (
+          <DiseaseReports
+            {...pageProps}
+          />
+        );
 
       case "risk-map":
-        return <RiskMap {...pageProps} />;
-
-      case "predictions":
-        return <PredictionManagement {...pageProps} />;
+        return (
+          <RiskMap
+            {...pageProps}
+          />
+        );
 
       case "notifications":
-        return <NotificationsPanel {...pageProps} />;
-
-      case "settings":
-        return <SettingsPage {...pageProps} />;
+        return (
+          <NotificationsPanel
+            {...pageProps}
+          />
+        );
 
       case "activity":
-        return <ActivityLogs {...pageProps} />;
+        return (
+          <ActivityLogs
+            {...pageProps}
+          />
+        );
+
+      case "settings":
+        return (
+          <SettingsPage
+            {...pageProps}
+          />
+        );
+
+      case "users":
+        return (
+          <ComingSoon
+            title="User Management"
+            description="Manage registered platform users, account status and access."
+          />
+        );
+
+      case "supervisors":
+        return (
+          <ComingSoon
+            title="Medical Supervisor Management"
+            description="Manage medical supervisor accounts and district assignments."
+          />
+        );
+
+      case "roles":
+        return (
+          <ComingSoon
+            title="Roles & Permissions"
+            description="Control platform roles and administrator access permissions."
+          />
+        );
+
+      case "location":
+        return (
+          <ComingSoon
+            title="Location Management"
+            description="Manage states, districts and taluk configuration."
+          />
+        );
+
+      case "health":
+        return (
+          <ComingSoon
+            title="System Health"
+            description="Monitor API services, database, authentication and synchronization."
+          />
+        );
+
+      case "analytics":
+        return (
+          <ComingSoon
+            title="Analytics"
+            description="View system-wide administrative analytics."
+          />
+        );
 
       default:
-        return <AdminDashboard {...pageProps} />;
+        return (
+          <AdminDashboard
+            {...pageProps}
+          />
+        );
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFAF6]">
-      return (
-  <AdminLayout
-    nav={NAV}
-    activeKey={page}
-    activePage={activePage}
-    onNavigate={setPage}
-    onExit={onExit}
-    location={location}
-    onLocationChange={setLocation}
-  >
-    {renderPage()}
-  </AdminLayout>
-);
-    </div>
+    <AdminLayout
+      nav={NAV}
+      activeKey={page}
+      activePage={activePage}
+      onNavigate={setPage}
+      onExit={onExit}
+      location={location}
+      onLocationChange={setLocation}
+    >
+      {renderPage()}
+    </AdminLayout>
+  );
+}
+
+function ComingSoon({
+  title,
+  description,
+}) {
+  return (
+    <section className="rounded-[12px] border border-[#E1E8E3] bg-white p-[24px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
+
+      <h1 className="text-[20px] font-semibold text-[#10243A]">
+        {title}
+      </h1>
+
+      <p className="mt-[7px] text-[12px] text-[#718096]">
+        {description}
+      </p>
+
+    </section>
   );
 }

@@ -101,7 +101,11 @@ const getErrorMessage = (detail) => {
           return String(item.message);
         }
 
-        return JSON.stringify(item);
+        try {
+          return JSON.stringify(item);
+        } catch {
+          return "";
+        }
       })
       .filter(Boolean)
       .join(" ");
@@ -188,7 +192,6 @@ const request = async (
   let requestBody = undefined;
 
   if (body !== undefined && body !== null) {
-    // IMPORTANT:
     // FormData must NOT be JSON.stringify()-ed and must NOT
     // receive an application/json Content-Type.
     if (body instanceof FormData) {
@@ -568,7 +571,9 @@ const api = {
 
     const decision = String(
       payload?.decision || ""
-    ).trim().toUpperCase();
+    )
+      .trim()
+      .toUpperCase();
 
     const allowedDecisions = [
       "APPROVE",
@@ -600,21 +605,61 @@ const api = {
   // WEEKLY MONITORING
   // ==========================================================
 
-  // Supports BOTH:
+  // Supports:
   //
   // api.getMedicalMonitoring()
   //
-  // and:
-  //
   // api.getMedicalMonitoring(202635)
-  //
-  // and:
   //
   // api.getMedicalMonitoring({
   //   week_number: 202635
   // })
+  //
+  // AND:
+  //
+  // api.getMonitoring()
+  //
+  // api.getMonitoring(202635)
+  //
+  // api.getMonitoring({
+  //   week_number: 202635
+  // })
+  //
+  // The getMonitoring alias is intentionally included because
+  // the Admin Dashboard uses the shorter method name.
 
   getMedicalMonitoring: async (
+    weekOrOptions
+  ) => {
+    let params = {};
+
+    if (
+      typeof weekOrOptions === "number" ||
+      typeof weekOrOptions === "string"
+    ) {
+      params.week_number = weekOrOptions;
+    } else if (
+      weekOrOptions &&
+      typeof weekOrOptions === "object"
+    ) {
+      params = {
+        ...weekOrOptions,
+      };
+    }
+
+    return request(
+      "/medical/monitoring",
+      {
+        params,
+      }
+    );
+  },
+
+  // ----------------------------------------------------------
+  // ADMIN DASHBOARD COMPATIBILITY ALIAS
+  // ----------------------------------------------------------
+
+  getMonitoring: async (
     weekOrOptions
   ) => {
     let params = {};
@@ -658,11 +703,41 @@ const api = {
     );
   },
 
+  // Admin/dashboard compatibility alias.
+  getAnalytics: async (
+    weeks = 8
+  ) => {
+    return request(
+      "/medical/analytics",
+      {
+        params: {
+          weeks,
+        },
+      }
+    );
+  },
+
   // ==========================================================
   // RISK MAP
   // ==========================================================
 
   getMedicalRiskMap: async (
+    disease = ""
+  ) => {
+    return request(
+      "/medical/risk-map",
+      {
+        params: disease
+          ? {
+              disease,
+            }
+          : undefined,
+      }
+    );
+  },
+
+  // Admin/dashboard compatibility alias.
+  getRiskMap: async (
     disease = ""
   ) => {
     return request(

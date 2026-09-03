@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import AdminHeader from "../../components/admin/AdminHeader";
 import AdminLocationSelector from "../../components/admin/AdminLocationSelector";
@@ -12,8 +14,13 @@ export default function AdminLayout({
   onLocationChange,
   children,
 }) {
+  const [
+    locationOpen,
+    setLocationOpen,
+  ] = useState(false);
+
   return (
-    <div className="min-h-screen bg-[#FCFAF6] text-[#1F3144] flex">
+    <div className="min-h-screen bg-[#FCFAF6] text-[#10243A]">
 
       <AdminSidebar
         nav={nav}
@@ -22,22 +29,31 @@ export default function AdminLayout({
         onExit={onExit}
       />
 
-      <main className="min-w-0 flex-1 lg:ml-[248px]">
+      <main className="min-h-screen lg:ml-[244px]">
 
         <AdminHeader
           activePage={activePage}
-          onExit={onExit}
+          location={location}
+          onOpenLocation={() =>
+            setLocationOpen(true)
+          }
         />
 
-        <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1500px] mx-auto">
+        <AdminLocationSelector
+          value={location}
+          onChange={onLocationChange}
+          open={locationOpen}
+          onClose={() =>
+            setLocationOpen(false)
+          }
+        />
 
-          <AdminLocationSelector
-            value={location}
-            onChange={onLocationChange}
-          />
+        <div className="px-[20px] py-[42px]">
 
-          <div className="mt-6">
+          <div className="mx-auto w-full max-w-[1254px]">
+
             {children}
+
           </div>
 
         </div>

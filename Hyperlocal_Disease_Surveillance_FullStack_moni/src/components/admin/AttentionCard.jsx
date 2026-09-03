@@ -7,50 +7,111 @@ export default function AttentionCard({
   tone = "neutral",
 }) {
   const accents = {
-    neutral: "bg-[#F6F3ED] text-[#526073]",
-    warning: "bg-[#FFF4D6] text-[#9A7200]",
-    danger: "bg-[#FBEAEA] text-[#C62828]",
-    success: "bg-[#EAF7EE] text-[#0B7A33]",
+    neutral:
+      "bg-[#EEF2FF] text-[#5C72C9]",
+
+    warning:
+      "bg-[#FFF4E7] text-[#DF6A17]",
+
+    danger:
+      "bg-[#FDEEEF] text-[#D72E42]",
+
+    success:
+      "bg-[#EAF6EE] text-[#0A8542]",
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E8E2D8] p-5 flex flex-col min-h-[164px]">
+    <div
+      className="
+        rounded-[13px]
+        border
+        border-[#DCE2DF]
+        bg-white
+        p-3.5
+        shadow-[0_2px_8px_rgba(20,40,55,0.03)]
+      "
+    >
 
-      <div className="flex items-start gap-3">
+      <div
+        className="
+          flex
+          items-center
+          gap-3
+          rounded-[10px]
+          border
+          border-[#E6EAE8]
+          px-3
+          py-2.5
+        "
+      >
 
         <div
           className={`
-            w-10 h-10 rounded-xl
-            flex items-center justify-center
+            h-9 w-9
             shrink-0
-            ${accents[tone]}
+            rounded-full
+            flex items-center
+            justify-center
+            ${
+              accents[tone]
+            }
           `}
         >
-          {Icon && <Icon size={19} />}
+          {Icon && (
+            <Icon
+              size={18}
+              strokeWidth={1.8}
+            />
+          )}
         </div>
 
-        <div className="min-w-0">
+        <div
+          className="
+            min-w-0
+            flex-1
+          "
+        >
 
-          <h3 className="font-semibold text-[14px] text-[#1F3144]">
+          <div
+            className="
+              text-[11px]
+              font-semibold
+              text-[#102943]
+            "
+          >
             {title}
-          </h3>
+          </div>
 
-          <div className="text-[13px] leading-5 text-[#6E798A] mt-1">
+          <div
+            className="
+              mt-0.5
+              text-[9px]
+              leading-4
+              text-[#6B7B8E]
+            "
+          >
             {children}
           </div>
 
         </div>
 
-      </div>
+        {action && (
+          <button
+            type="button"
+            onClick={onClick}
+            className="
+              shrink-0
+              text-[10px]
+              font-semibold
+              text-[#087D3D]
+              hover:underline
+            "
+          >
+            {action} →
+          </button>
+        )}
 
-      {action && (
-        <button
-          onClick={onClick}
-          className="mt-auto pt-4 text-left text-[12.5px] font-semibold text-[#0B7A33] hover:underline"
-        >
-          {action} →
-        </button>
-      )}
+      </div>
 
     </div>
   );
