@@ -20,19 +20,30 @@ import AdminLayout from "./AdminLayout";
 import AdminDashboard from "./AdminDashboard";
 
 import AgentManagement from "./AgentManagement";
+
+/*
+ * IMPORTANT:
+ * Your existing working file is SupervisorManagement.jsx.
+ * DO NOT change this to MedicalSupervisorManagement.jsx.
+ */
 import SupervisorManagement from "./SupervisorManagement";
+
 import WeeklyMonitoring from "./WeeklyMonitoring";
 import DiseaseReports from "./DiseaseReports";
-import PredictionManagement from "./PredictionManagement";
 import NotificationsPanel from "./NotificationsPanel";
 import RiskMap from "./RiskMap";
 import SettingsPage from "./Settings";
 import ActivityLogs from "./ActivityLogs";
 
+/*
+ * Roles & Permissions page
+ */
+import RolesPermissions from "./RolesPermissions";
+
 
 /* ============================================================
    ADMIN NAVIGATION
-============================================================ */
+   ============================================================ */
 
 const NAV = [
   {
@@ -147,57 +158,63 @@ const NAV = [
 
 /* ============================================================
    ADMIN PORTAL
-============================================================ */
+   ============================================================ */
 
-export default function AdminPortal({
-  onExit,
-}) {
-  const [
-    page,
-    setPage,
-  ] = useState("dashboard");
+export default function AdminPortal({ onExit }) {
+  /*
+   * Current selected admin section
+   */
+  const [page, setPage] = useState("dashboard");
 
-  const [
-    location,
-    setLocation,
-  ] = useState({
+
+  /*
+   * Current location selection
+   */
+  const [location, setLocation] = useState({
     state: null,
     district: null,
     taluk: null,
   });
 
 
-  const activePage =
-    useMemo(() => {
-      const items =
-        NAV.flatMap(
-          (group) =>
-            group.items ||
-            [group]
-        );
+  /*
+   * Find currently active navigation item.
+   */
+  const activePage = useMemo(() => {
+    const allItems = NAV.flatMap((group) => {
+      if (group.items) {
+        return group.items;
+      }
 
-      return (
-        items.find(
-          (item) =>
-            item.key === page
-        ) ||
-        items[0]
-      );
-    }, [page]);
+      return [group];
+    });
+
+    return (
+      allItems.find((item) => item.key === page) ||
+      allItems[0]
+    );
+  }, [page]);
 
 
+  /*
+   * Props shared with pages.
+   */
   const pageProps = {
     location,
     onNavigate: setPage,
   };
 
 
-  /* ==========================================================
+  /* ============================================================
      PAGE ROUTER
-  ========================================================== */
+     ============================================================ */
 
   const renderPage = () => {
     switch (page) {
+
+      /* --------------------------------------------------------
+         DASHBOARD
+         -------------------------------------------------------- */
 
       case "dashboard":
         return (
@@ -207,69 +224,9 @@ export default function AdminPortal({
         );
 
 
-      case "agents":
-        return (
-          <AgentManagement
-            {...pageProps}
-          />
-        );
-
-
-      case "supervisors":
-        return (
-          <SupervisorManagement
-            {...pageProps}
-          />
-        );
-
-
-      case "monitoring":
-        return (
-          <WeeklyMonitoring
-            {...pageProps}
-          />
-        );
-
-
-      case "reports":
-        return (
-          <DiseaseReports
-            {...pageProps}
-          />
-        );
-
-
-      case "risk-map":
-        return (
-          <RiskMap
-            {...pageProps}
-          />
-        );
-
-
-      case "notifications":
-        return (
-          <NotificationsPanel
-            {...pageProps}
-          />
-        );
-
-
-      case "activity":
-        return (
-          <ActivityLogs
-            {...pageProps}
-          />
-        );
-
-
-      case "settings":
-        return (
-          <SettingsPage
-            {...pageProps}
-          />
-        );
-
+      /* --------------------------------------------------------
+         USER MANAGEMENT
+         -------------------------------------------------------- */
 
       case "users":
         return (
@@ -280,14 +237,108 @@ export default function AdminPortal({
         );
 
 
-      case "roles":
+      /* --------------------------------------------------------
+         AGENT MANAGEMENT
+         -------------------------------------------------------- */
+
+      case "agents":
         return (
-          <ComingSoon
-            title="Roles & Permissions"
-            description="Control platform roles and administrator access permissions."
+          <AgentManagement
+            {...pageProps}
           />
         );
 
+
+      /* --------------------------------------------------------
+         MEDICAL SUPERVISOR MANAGEMENT
+         --------------------------------------------------------
+
+         IMPORTANT:
+
+         This MUST remain SupervisorManagement.
+
+         Your project already contains:
+
+         src/pages/admin/SupervisorManagement.jsx
+
+         and that component contains the complete supervisor
+         functionality.
+
+         Do NOT change this to MedicalSupervisorManagement.
+         -------------------------------------------------------- */
+
+      case "supervisors":
+        return (
+          <SupervisorManagement
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         ROLES & PERMISSIONS
+         -------------------------------------------------------- */
+
+      case "roles":
+        return (
+          <RolesPermissions
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         REPORT MANAGEMENT
+         -------------------------------------------------------- */
+
+      case "reports":
+        return (
+          <DiseaseReports
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         WEEKLY MONITORING
+         -------------------------------------------------------- */
+
+      case "monitoring":
+        return (
+          <WeeklyMonitoring
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         RISK MAP
+         -------------------------------------------------------- */
+
+      case "risk-map":
+        return (
+          <RiskMap
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         ANALYTICS
+         -------------------------------------------------------- */
+
+      case "analytics":
+        return (
+          <ComingSoon
+            title="Analytics"
+            description="View system-wide administrative analytics."
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         LOCATION MANAGEMENT
+         -------------------------------------------------------- */
 
       case "location":
         return (
@@ -298,6 +349,10 @@ export default function AdminPortal({
         );
 
 
+      /* --------------------------------------------------------
+         SYSTEM HEALTH
+         -------------------------------------------------------- */
+
       case "health":
         return (
           <ComingSoon
@@ -307,14 +362,45 @@ export default function AdminPortal({
         );
 
 
-      case "analytics":
+      /* --------------------------------------------------------
+         NOTIFICATIONS
+         -------------------------------------------------------- */
+
+      case "notifications":
         return (
-          <ComingSoon
-            title="Analytics"
-            description="View system-wide administrative analytics."
+          <NotificationsPanel
+            {...pageProps}
           />
         );
 
+
+      /* --------------------------------------------------------
+         ACTIVITY LOGS
+         -------------------------------------------------------- */
+
+      case "activity":
+        return (
+          <ActivityLogs
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         SETTINGS
+         -------------------------------------------------------- */
+
+      case "settings":
+        return (
+          <SettingsPage
+            {...pageProps}
+          />
+        );
+
+
+      /* --------------------------------------------------------
+         FALLBACK
+         -------------------------------------------------------- */
 
       default:
         return (
@@ -326,6 +412,10 @@ export default function AdminPortal({
   };
 
 
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+
   return (
     <AdminLayout
       nav={NAV}
@@ -334,9 +424,7 @@ export default function AdminPortal({
       onNavigate={setPage}
       onExit={onExit}
       location={location}
-      onLocationChange={
-        setLocation
-      }
+      onLocationChange={setLocation}
     >
       {renderPage()}
     </AdminLayout>
@@ -346,41 +434,20 @@ export default function AdminPortal({
 
 /* ============================================================
    COMING SOON
-============================================================ */
+   ============================================================ */
 
 function ComingSoon({
   title,
   description,
 }) {
   return (
-    <section
-      className="
-        rounded-[12px]
-        border
-        border-[#E1E8E3]
-        bg-white
-        p-[24px]
-        shadow-[0_2px_7px_rgba(31,49,68,.035)]
-      "
-    >
+    <section className="rounded-[12px] border border-[#E1E8E3] bg-white p-[24px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
 
-      <h1
-        className="
-          text-[20px]
-          font-semibold
-          text-[#10243A]
-        "
-      >
+      <h1 className="text-[20px] font-semibold text-[#10243A]">
         {title}
       </h1>
 
-      <p
-        className="
-          mt-[7px]
-          text-[12px]
-          text-[#718096]
-        "
-      >
+      <p className="mt-[7px] text-[12px] text-[#718096]">
         {description}
       </p>
 
