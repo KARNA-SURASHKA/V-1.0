@@ -3,6 +3,7 @@
 // ============================================================
 
 // Keep the frontend and backend on the same loopback hostname.
+//
 // Backend:
 //   uvicorn app.main:app --reload
 //
@@ -150,11 +151,15 @@ const buildUrl = (endpoint, params) => {
         value !== null &&
         value !== ""
       ) {
-        searchParams.append(key, String(value));
+        searchParams.append(
+          key,
+          String(value)
+        );
       }
     });
 
-    const queryString = searchParams.toString();
+    const queryString =
+      searchParams.toString();
 
     if (queryString) {
       url += `?${queryString}`;
@@ -179,7 +184,10 @@ const request = async (
     auth = true,
   } = options;
 
-  const url = buildUrl(endpoint, params);
+  const url = buildUrl(
+    endpoint,
+    params
+  );
 
   const headers = {
     Accept: "application/json",
@@ -191,13 +199,18 @@ const request = async (
 
   let requestBody = undefined;
 
-  if (body !== undefined && body !== null) {
-    // FormData must NOT be JSON.stringify()-ed and must NOT
-    // receive an application/json Content-Type.
+  if (
+    body !== undefined &&
+    body !== null
+  ) {
+    // FormData must NOT be JSON.stringify()-ed.
+    // It must also NOT receive application/json.
     if (body instanceof FormData) {
       requestBody = body;
     } else {
-      headers["Content-Type"] = "application/json";
+      headers["Content-Type"] =
+        "application/json";
+
       requestBody = JSON.stringify(body);
     }
   }
@@ -210,15 +223,18 @@ const request = async (
     const token = getToken();
 
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      headers.Authorization =
+        `Bearer ${token}`;
     }
   }
 
   console.log(
     `[API REQUEST] ${method} ${url}`,
     {
-      authenticated: auth && Boolean(getToken()),
-      hasToken: Boolean(getToken()),
+      authenticated:
+        auth && Boolean(getToken()),
+      hasToken:
+        Boolean(getToken()),
     }
   );
 
@@ -250,7 +266,8 @@ const request = async (
   // RESPONSE
   // ----------------------------------------------------------
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
   let data = null;
 
@@ -581,7 +598,11 @@ const api = {
       "KEEP_PENDING",
     ];
 
-    if (!allowedDecisions.includes(decision)) {
+    if (
+      !allowedDecisions.includes(
+        decision
+      )
+    ) {
       throw new Error(
         "Invalid review decision. Use APPROVE, REJECT or KEEP_PENDING."
       );
@@ -593,9 +614,10 @@ const api = {
         method: "PUT",
         body: {
           decision,
-          review_notes: String(
-            payload?.review_notes || ""
-          ).trim(),
+          review_notes:
+            String(
+              payload?.review_notes || ""
+            ).trim(),
         },
       }
     );
@@ -604,29 +626,6 @@ const api = {
   // ==========================================================
   // WEEKLY MONITORING
   // ==========================================================
-
-  // Supports:
-  //
-  // api.getMedicalMonitoring()
-  //
-  // api.getMedicalMonitoring(202635)
-  //
-  // api.getMedicalMonitoring({
-  //   week_number: 202635
-  // })
-  //
-  // AND:
-  //
-  // api.getMonitoring()
-  //
-  // api.getMonitoring(202635)
-  //
-  // api.getMonitoring({
-  //   week_number: 202635
-  // })
-  //
-  // The getMonitoring alias is intentionally included because
-  // the Admin Dashboard uses the shorter method name.
 
   getMedicalMonitoring: async (
     weekOrOptions
@@ -637,7 +636,8 @@ const api = {
       typeof weekOrOptions === "number" ||
       typeof weekOrOptions === "string"
     ) {
-      params.week_number = weekOrOptions;
+      params.week_number =
+        weekOrOptions;
     } else if (
       weekOrOptions &&
       typeof weekOrOptions === "object"
@@ -655,10 +655,6 @@ const api = {
     );
   },
 
-  // ----------------------------------------------------------
-  // ADMIN DASHBOARD COMPATIBILITY ALIAS
-  // ----------------------------------------------------------
-
   getMonitoring: async (
     weekOrOptions
   ) => {
@@ -668,7 +664,8 @@ const api = {
       typeof weekOrOptions === "number" ||
       typeof weekOrOptions === "string"
     ) {
-      params.week_number = weekOrOptions;
+      params.week_number =
+        weekOrOptions;
     } else if (
       weekOrOptions &&
       typeof weekOrOptions === "object"
@@ -703,7 +700,6 @@ const api = {
     );
   },
 
-  // Admin/dashboard compatibility alias.
   getAnalytics: async (
     weeks = 8
   ) => {
@@ -736,7 +732,6 @@ const api = {
     );
   },
 
-  // Admin/dashboard compatibility alias.
   getRiskMap: async (
     disease = ""
   ) => {
@@ -792,7 +787,8 @@ const api = {
   submitAgentIssue: async (
     payload
   ) => {
-    const formData = new FormData();
+    const formData =
+      new FormData();
 
     formData.append(
       "agent_id",
@@ -830,7 +826,9 @@ const api = {
     );
 
     if (
-      Array.isArray(payload?.files)
+      Array.isArray(
+        payload?.files
+      )
     ) {
       payload.files.forEach(
         (file) => {
@@ -1119,16 +1117,17 @@ const api = {
     );
   },
 
-  getSupervisorMedicalHomeRelief: async (
-    params = {}
-  ) => {
-    return request(
-      "/medical/home-relief",
-      {
-        params,
-      }
-    );
-  },
+  getSupervisorMedicalHomeRelief:
+    async (
+      params = {}
+    ) => {
+      return request(
+        "/medical/home-relief",
+        {
+          params,
+        }
+      );
+    },
 
   createHomeRelief: async (
     payload
@@ -1243,49 +1242,284 @@ const api = {
   },
 
   // ==========================================================
+  // MEDICAL SUPERVISOR MANAGEMENT
+  // ==========================================================
+
+  getMedicalSupervisors: async (
+    params = {}
+  ) => {
+    const cleanParams = {
+      ...params,
+    };
+
+    // Prevent empty/non-numeric district_id
+    // values from reaching FastAPI integer validation.
+    if (
+      cleanParams.district_id === "" ||
+      cleanParams.district_id === null ||
+      cleanParams.district_id === undefined
+    ) {
+      delete cleanParams.district_id;
+    } else {
+      const districtId =
+        Number(
+          cleanParams.district_id
+        );
+
+      if (
+        Number.isFinite(
+          districtId
+        )
+      ) {
+        cleanParams.district_id =
+          districtId;
+      } else {
+        delete cleanParams.district_id;
+      }
+    }
+
+    if (
+      cleanParams.search === ""
+    ) {
+      delete cleanParams.search;
+    }
+
+    if (
+      cleanParams.status === ""
+    ) {
+      delete cleanParams.status;
+    }
+
+    if (
+      cleanParams.assignment === ""
+    ) {
+      delete cleanParams.assignment;
+    }
+
+    return request(
+      "/admin/supervisors",
+      {
+        params: cleanParams,
+      }
+    );
+  },
+
+  getMedicalSupervisorDetails:
+    async (
+      supervisorId
+    ) => {
+      if (
+        supervisorId ===
+          undefined ||
+        supervisorId === null ||
+        supervisorId === ""
+      ) {
+        throw new Error(
+          "A valid supervisor ID is required."
+        );
+      }
+
+      return request(
+        `/admin/supervisors/${supervisorId}/details`
+      );
+    },
+
+  createMedicalSupervisor:
+    async (
+      payload
+    ) => {
+      return request(
+        "/admin/supervisors",
+        {
+          method: "POST",
+          body: payload,
+        }
+      );
+    },
+
+  updateMedicalSupervisor:
+    async (
+      supervisorId,
+      payload
+    ) => {
+      if (
+        supervisorId ===
+          undefined ||
+        supervisorId === null ||
+        supervisorId === ""
+      ) {
+        throw new Error(
+          "A valid supervisor ID is required."
+        );
+      }
+
+      return request(
+        `/admin/supervisors/${supervisorId}`,
+        {
+          method: "PUT",
+          body: payload,
+        }
+      );
+    },
+
+  updateMedicalSupervisorStatus:
+    async (
+      supervisorId,
+      isActive
+    ) => {
+      if (
+        supervisorId ===
+          undefined ||
+        supervisorId === null ||
+        supervisorId === ""
+      ) {
+        throw new Error(
+          "A valid supervisor ID is required."
+        );
+      }
+
+      return request(
+        `/admin/supervisors/${supervisorId}/status`,
+        {
+          method: "PATCH",
+          body: {
+            is_active:
+              Boolean(isActive),
+          },
+        }
+      );
+    },
+
+  deleteMedicalSupervisor:
+    async (
+      supervisorId
+    ) => {
+      if (
+        supervisorId ===
+          undefined ||
+        supervisorId === null ||
+        supervisorId === ""
+      ) {
+        throw new Error(
+          "A valid supervisor ID is required."
+        );
+      }
+
+      return request(
+        `/admin/supervisors/${supervisorId}`,
+        {
+          method: "DELETE",
+        }
+      );
+    },
+
+  // ==========================================================
   // AGENT MANAGEMENT
   // ==========================================================
 
-  listAgents: async (params = {}) => {
-    return request("/admin/agents", { params });
+  listAgents: async (
+    params = {}
+  ) => {
+    return request(
+      "/admin/agents",
+      {
+        params,
+      }
+    );
   },
 
-  createAgent: async (payload) => {
-    return request("/admin/agents", { method: "POST", body: payload });
+  createAgent: async (
+    payload
+  ) => {
+    return request(
+      "/admin/agents",
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
   },
 
-  updateAgent: async (agentId, payload) => {
-    return request(`/admin/agents/${agentId}`, { method: "PUT", body: payload });
+  updateAgent: async (
+    agentId,
+    payload
+  ) => {
+    return request(
+      `/admin/agents/${agentId}`,
+      {
+        method: "PUT",
+        body: payload,
+      }
+    );
   },
 
-  updateAgentStatus: async (agentId, isActive) => {
-    return request(`/admin/agents/${agentId}/status`, {
-      method: "PATCH",
-      params: { is_active: isActive },
-    });
+  updateAgentStatus: async (
+    agentId,
+    isActive
+  ) => {
+    return request(
+      `/admin/agents/${agentId}/status`,
+      {
+        method: "PATCH",
+        params: {
+          is_active: isActive,
+        },
+      }
+    );
   },
 
-  deleteAgent: async (agentId) => {
-    return request(`/admin/agents/${agentId}`, { method: "DELETE" });
+  deleteAgent: async (
+    agentId
+  ) => {
+    return request(
+      `/admin/agents/${agentId}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 
-  getAgentManagementStats: async (params = {}) => {
-    return request("/admin/agents/stats", { params });
+  getAgentManagementStats:
+    async (
+      params = {}
+    ) => {
+      return request(
+        "/admin/agents/stats",
+        {
+          params,
+        }
+      );
+    },
+
+  getAgentDetails: async (
+    agentId
+  ) => {
+    return request(
+      `/admin/agents/${agentId}/details`
+    );
   },
 
-  getAgentDetails: async (agentId) => {
-    return request(`/admin/agents/${agentId}/details`);
+  getAgentReports: async (
+    agentId
+  ) => {
+    return request(
+      `/admin/agents/${agentId}/reports`
+    );
   },
 
-  getAgentReports: async (agentId) => {
-    return request(`/admin/agents/${agentId}/reports`);
-  },
-
-  issueAgentWarning: async (agentId, message) => {
-    return request(`/admin/agents/${agentId}/warning`, {
-      method: "POST",
-      body: { message },
-    });
+  issueAgentWarning: async (
+    agentId,
+    message
+  ) => {
+    return request(
+      `/admin/agents/${agentId}/warning`,
+      {
+        method: "POST",
+        body: {
+          message,
+        },
+      }
+    );
   },
 
   // ==========================================================
@@ -1319,7 +1553,7 @@ export const RISK_COLORS = {
 };
 
 // ============================================================
-// EXPORTS
+// NAMED EXPORTS
 // ============================================================
 
 export {

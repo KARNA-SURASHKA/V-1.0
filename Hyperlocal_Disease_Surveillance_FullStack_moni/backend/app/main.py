@@ -12,23 +12,27 @@ from .routers.agent import router as agent_router
 from .routers.admin import router as admin_router
 from .routers.medical_chat import router as medical_chat_router
 from .routers.medical import router as medical_router
-from .routers.medical_supervisor import router as medical_supervisor_router
+from .routers.medical_supervisor import (
+    router as medical_supervisor_router
+)
 from .routers.home_relief import router as home_relief_router
+
+# Medical Supervisor Management
+from .routers.admin_supervisors import (
+    router as admin_supervisors_router
+)
 
 
 # ============================================================
-# DATABASE
+# DATABASE INITIALIZATION
 # ============================================================
 
 models.Base.metadata.create_all(
     bind=engine
 )
 
-# Keep existing databases compatible with the current model definitions.
 ensure_schema_compatibility()
 
-# Ensure the Medical Supervisor feature registry/account exists without
-# reseeding or replacing existing surveillance data.
 initialize_feature()
 
 
@@ -37,7 +41,8 @@ initialize_feature()
 # ============================================================
 
 app = FastAPI(
-    title="Hyperlocal Disease Surveillance API"
+    title="Hyperlocal Disease Surveillance API",
+    version="1.0.0",
 )
 
 
@@ -51,9 +56,19 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
     ],
-    # Also permit another local Vite port (5174, 5175, etc.) during development.
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+
+    allow_origin_regex=(
+        r"https?://"
+        r"(localhost|127\.0\.0\.1)"
+        r"(:\d+)?$"
+    ),
 
     allow_credentials=True,
 
@@ -69,44 +84,88 @@ app.add_middleware(
 # ROUTERS
 # ============================================================
 
+# Authentication
 app.include_router(
     auth_router
 )
 
+
+# Locations
 app.include_router(
     locations_router
 )
 
+
+# User Dashboard
 app.include_router(
     dashboard_router
 )
 
+
+# Agent
 app.include_router(
     agent_router
 )
 
+
+# Admin
 app.include_router(
     admin_router
 )
 
-# District-scoped Medical Supervisor API.
-# This router is registered before the legacy medical router so that
-# supervisor requests can never escape the assigned district.
+
+# ============================================================
+# ADMIN MEDICAL SUPERVISOR MANAGEMENT
+# ============================================================
+#
+# Handles:
+#
+# GET    /admin/supervisors
+# GET    /admin/supervisors/stats
+# GET    /admin/supervisors/{id}
+# POST   /admin/supervisors
+# PUT    /admin/supervisors/{id}
+# PATCH  /admin/supervisors/{id}/status
+# DELETE /admin/supervisors/{id}
+#
+# ============================================================
+
+app.include_router(
+    admin_supervisors_router
+)
+
+
+# ============================================================
+# MEDICAL SUPERVISOR PORTAL
+# ============================================================
+
 app.include_router(
     medical_supervisor_router
 )
 
-# Legacy Medical Supervisor / Home Relief endpoints.
+
+# ============================================================
+# LEGACY MEDICAL ROUTES
+# ============================================================
+
 app.include_router(
     medical_router
 )
 
-# AI Medical Chatbot
+
+# ============================================================
+# AI MEDICAL CHATBOT
+# ============================================================
+
 app.include_router(
     medical_chat_router
 )
 
-# Public approved Home Relief search
+
+# ============================================================
+# HOME RELIEF
+# ============================================================
+
 app.include_router(
     home_relief_router
 )
@@ -116,16 +175,26 @@ app.include_router(
 # HEALTH CHECK
 # ============================================================
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["system"]
+)
 def health():
-    return {"ok": True, "service": "Hyperlocal Disease Surveillance API"}
+
+    return {
+        "ok": True,
+        "service": "Hyperlocal Disease Surveillance API",
+    }
 
 
 # ============================================================
 # ROOT
 # ============================================================
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["system"]
+)
 def root():
 
     return {

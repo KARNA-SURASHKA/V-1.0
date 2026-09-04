@@ -20,6 +20,7 @@ import AdminLayout from "./AdminLayout";
 import AdminDashboard from "./AdminDashboard";
 
 import AgentManagement from "./AgentManagement";
+import SupervisorManagement from "./SupervisorManagement";
 import WeeklyMonitoring from "./WeeklyMonitoring";
 import DiseaseReports from "./DiseaseReports";
 import PredictionManagement from "./PredictionManagement";
@@ -27,6 +28,11 @@ import NotificationsPanel from "./NotificationsPanel";
 import RiskMap from "./RiskMap";
 import SettingsPage from "./Settings";
 import ActivityLogs from "./ActivityLogs";
+
+
+/* ============================================================
+   ADMIN NAVIGATION
+============================================================ */
 
 const NAV = [
   {
@@ -37,22 +43,26 @@ const NAV = [
 
   {
     section: "PEOPLE & ACCESS",
+
     items: [
       {
         key: "users",
         label: "User Management",
         icon: UsersRound,
       },
+
       {
         key: "agents",
         label: "Agent Management",
         icon: UserCog,
       },
+
       {
         key: "supervisors",
         label: "Medical Supervisor Management",
         icon: UserCog,
       },
+
       {
         key: "roles",
         label: "Roles & Permissions",
@@ -63,22 +73,26 @@ const NAV = [
 
   {
     section: "SURVEILLANCE DATA",
+
     items: [
       {
         key: "reports",
         label: "Report Management",
         icon: FileText,
       },
+
       {
         key: "monitoring",
         label: "Weekly Monitoring",
         icon: ClipboardCheck,
       },
+
       {
         key: "risk-map",
         label: "Risk Map",
         icon: MapPinned,
       },
+
       {
         key: "analytics",
         label: "Analytics",
@@ -89,6 +103,7 @@ const NAV = [
 
   {
     section: "LOCATION",
+
     items: [
       {
         key: "location",
@@ -100,22 +115,26 @@ const NAV = [
 
   {
     section: "SYSTEM",
+
     items: [
       {
         key: "health",
         label: "System Health",
         icon: Activity,
       },
+
       {
         key: "notifications",
         label: "Notifications",
         icon: Bell,
       },
+
       {
         key: "activity",
         label: "Activity Logs",
         icon: ScrollText,
       },
+
       {
         key: "settings",
         label: "Settings",
@@ -125,45 +144,68 @@ const NAV = [
   },
 ];
 
+
+/* ============================================================
+   ADMIN PORTAL
+============================================================ */
+
 export default function AdminPortal({
   onExit,
 }) {
-  const [page, setPage] =
-    useState("dashboard");
+  const [
+    page,
+    setPage,
+  ] = useState("dashboard");
 
-  const [location, setLocation] =
-    useState({
-      state: null,
-      district: null,
-      taluk: null,
-    });
+  const [
+    location,
+    setLocation,
+  ] = useState({
+    state: null,
+    district: null,
+    taluk: null,
+  });
 
-  const activePage = useMemo(() => {
-    const items = NAV.flatMap(
-      (group) =>
-        group.items || [group]
-    );
 
-    return (
-      items.find(
-        (item) => item.key === page
-      ) || items[0]
-    );
-  }, [page]);
+  const activePage =
+    useMemo(() => {
+      const items =
+        NAV.flatMap(
+          (group) =>
+            group.items ||
+            [group]
+        );
+
+      return (
+        items.find(
+          (item) =>
+            item.key === page
+        ) ||
+        items[0]
+      );
+    }, [page]);
+
 
   const pageProps = {
     location,
     onNavigate: setPage,
   };
 
+
+  /* ==========================================================
+     PAGE ROUTER
+  ========================================================== */
+
   const renderPage = () => {
     switch (page) {
+
       case "dashboard":
         return (
           <AdminDashboard
             {...pageProps}
           />
         );
+
 
       case "agents":
         return (
@@ -172,12 +214,22 @@ export default function AdminPortal({
           />
         );
 
+
+      case "supervisors":
+        return (
+          <SupervisorManagement
+            {...pageProps}
+          />
+        );
+
+
       case "monitoring":
         return (
           <WeeklyMonitoring
             {...pageProps}
           />
         );
+
 
       case "reports":
         return (
@@ -186,12 +238,14 @@ export default function AdminPortal({
           />
         );
 
+
       case "risk-map":
         return (
           <RiskMap
             {...pageProps}
           />
         );
+
 
       case "notifications":
         return (
@@ -200,6 +254,7 @@ export default function AdminPortal({
           />
         );
 
+
       case "activity":
         return (
           <ActivityLogs
@@ -207,12 +262,14 @@ export default function AdminPortal({
           />
         );
 
+
       case "settings":
         return (
           <SettingsPage
             {...pageProps}
           />
         );
+
 
       case "users":
         return (
@@ -222,13 +279,6 @@ export default function AdminPortal({
           />
         );
 
-      case "supervisors":
-        return (
-          <ComingSoon
-            title="Medical Supervisor Management"
-            description="Manage medical supervisor accounts and district assignments."
-          />
-        );
 
       case "roles":
         return (
@@ -238,6 +288,7 @@ export default function AdminPortal({
           />
         );
 
+
       case "location":
         return (
           <ComingSoon
@@ -245,6 +296,7 @@ export default function AdminPortal({
             description="Manage states, districts and taluk configuration."
           />
         );
+
 
       case "health":
         return (
@@ -254,6 +306,7 @@ export default function AdminPortal({
           />
         );
 
+
       case "analytics":
         return (
           <ComingSoon
@@ -261,6 +314,7 @@ export default function AdminPortal({
             description="View system-wide administrative analytics."
           />
         );
+
 
       default:
         return (
@@ -271,6 +325,7 @@ export default function AdminPortal({
     }
   };
 
+
   return (
     <AdminLayout
       nav={NAV}
@@ -279,25 +334,53 @@ export default function AdminPortal({
       onNavigate={setPage}
       onExit={onExit}
       location={location}
-      onLocationChange={setLocation}
+      onLocationChange={
+        setLocation
+      }
     >
       {renderPage()}
     </AdminLayout>
   );
 }
 
+
+/* ============================================================
+   COMING SOON
+============================================================ */
+
 function ComingSoon({
   title,
   description,
 }) {
   return (
-    <section className="rounded-[12px] border border-[#E1E8E3] bg-white p-[24px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
+    <section
+      className="
+        rounded-[12px]
+        border
+        border-[#E1E8E3]
+        bg-white
+        p-[24px]
+        shadow-[0_2px_7px_rgba(31,49,68,.035)]
+      "
+    >
 
-      <h1 className="text-[20px] font-semibold text-[#10243A]">
+      <h1
+        className="
+          text-[20px]
+          font-semibold
+          text-[#10243A]
+        "
+      >
         {title}
       </h1>
 
-      <p className="mt-[7px] text-[12px] text-[#718096]">
+      <p
+        className="
+          mt-[7px]
+          text-[12px]
+          text-[#718096]
+        "
+      >
         {description}
       </p>
 
