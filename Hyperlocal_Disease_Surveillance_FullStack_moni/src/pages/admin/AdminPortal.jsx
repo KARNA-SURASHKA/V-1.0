@@ -1,422 +1,330 @@
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useState,
+} from "react";
 
 import {
   Activity,
   BarChart3,
   Bell,
-  ClipboardCheck,
   FileText,
-  LayoutDashboard,
+  Home,
   Map,
-  MapPinned,
   ScrollText,
   Settings,
   ShieldCheck,
   UserCog,
-  UsersRound,
 } from "lucide-react";
 
-import AdminLayout from "./AdminLayout";
-import AdminDashboard from "./AdminDashboard";
+import AdminLayout
+  from "./AdminLayout";
 
-import AgentManagement from "./AgentManagement";
+import AdminDashboard
+  from "./AdminDashboard";
 
-/*
- * IMPORTANT:
- * Your existing working file is SupervisorManagement.jsx.
- * DO NOT change this to MedicalSupervisorManagement.jsx.
- */
-import SupervisorManagement from "./SupervisorManagement";
+import AgentManagement
+  from "./AgentManagement";
 
-import WeeklyMonitoring from "./WeeklyMonitoring";
-import DiseaseReports from "./DiseaseReports";
-import NotificationsPanel from "./NotificationsPanel";
-import RiskMap from "./RiskMap";
-import SettingsPage from "./Settings";
-import ActivityLogs from "./ActivityLogs";
+import SupervisorManagement
+  from "./SupervisorManagement";
 
-/*
- * Roles & Permissions page
- */
-import RolesPermissions from "./RolesPermissions";
+import DiseaseReports
+  from "./DiseaseReports";
+
+import RiskMap
+  from "./RiskMap";
+
+import NotificationsPanel
+  from "./NotificationsPanel";
+
+import ActivityLogs
+  from "./ActivityLogs";
+
+import SettingsPage
+  from "./Settings";
+
+import RolesPermissions
+  from "./RolesPermissions";
+
+import WeeklyMonitoring
+  from "./WeeklyMonitoring";
 
 
 /* ============================================================
-   ADMIN NAVIGATION
-   ============================================================ */
+   REFERENCE SIDEBAR NAVIGATION
+============================================================ */
 
 const NAV = [
+
   {
     key: "dashboard",
     label: "Dashboard",
-    icon: LayoutDashboard,
+    icon: Home,
   },
+
 
   {
-    section: "PEOPLE & ACCESS",
-
-    items: [
-      {
-        key: "users",
-        label: "User Management",
-        icon: UsersRound,
-      },
-
-      {
-        key: "agents",
-        label: "Agent Management",
-        icon: UserCog,
-      },
-
-      {
-        key: "supervisors",
-        label: "Medical Supervisor Management",
-        icon: UserCog,
-      },
-
-      {
-        key: "roles",
-        label: "Roles & Permissions",
-        icon: ShieldCheck,
-      },
-    ],
+    key: "agents",
+    label: "Agent Management",
+    icon: UserCog,
   },
+
 
   {
-    section: "SURVEILLANCE DATA",
-
-    items: [
-      {
-        key: "reports",
-        label: "Report Management",
-        icon: FileText,
-      },
-
-      {
-        key: "monitoring",
-        label: "Weekly Monitoring",
-        icon: ClipboardCheck,
-      },
-
-      {
-        key: "risk-map",
-        label: "Risk Map",
-        icon: MapPinned,
-      },
-
-      {
-        key: "analytics",
-        label: "Analytics",
-        icon: BarChart3,
-      },
-    ],
+    key: "supervisors",
+    label:
+      "Medical Supervisor Management",
+    icon: ShieldCheck,
   },
+
 
   {
-    section: "LOCATION",
-
-    items: [
-      {
-        key: "location",
-        label: "Location Management",
-        icon: Map,
-      },
-    ],
+    key: "reports",
+    label: "Report Management",
+    icon: FileText,
   },
+
 
   {
-    section: "SYSTEM",
-
-    items: [
-      {
-        key: "health",
-        label: "System Health",
-        icon: Activity,
-      },
-
-      {
-        key: "notifications",
-        label: "Notifications",
-        icon: Bell,
-      },
-
-      {
-        key: "activity",
-        label: "Activity Logs",
-        icon: ScrollText,
-      },
-
-      {
-        key: "settings",
-        label: "Settings",
-        icon: Settings,
-      },
-    ],
+    key: "risk-map",
+    label: "Risk Map",
+    icon: Map,
   },
+
+
+  {
+    key: "analytics",
+    label: "Analytics",
+    icon: BarChart3,
+  },
+
+
+  {
+    key: "notifications",
+    label: "Notifications",
+    icon: Bell,
+  },
+
+
+  {
+    key: "activity",
+    label: "Activity Logs",
+    icon: ScrollText,
+  },
+
+
+  {
+    key: "settings",
+    label: "Settings",
+    icon: Settings,
+  },
+
 ];
 
 
 /* ============================================================
    ADMIN PORTAL
-   ============================================================ */
+============================================================ */
 
-export default function AdminPortal({ onExit }) {
-  /*
-   * Current selected admin section
-   */
-  const [page, setPage] = useState("dashboard");
+export default function AdminPortal({
+  onExit,
+}) {
 
-
-  /*
-   * Current location selection
-   */
-  const [location, setLocation] = useState({
-    state: null,
-    district: null,
-    taluk: null,
-  });
+  const [
+    page,
+    setPage,
+  ] =
+    useState(
+      "dashboard"
+    );
 
 
-  /*
-   * Find currently active navigation item.
-   */
-  const activePage = useMemo(() => {
-    const allItems = NAV.flatMap((group) => {
-      if (group.items) {
-        return group.items;
-      }
+  const [
+    location,
+    setLocation,
+  ] =
+    useState({
 
-      return [group];
+      state: null,
+
+      district: null,
+
+      taluk: null,
+
     });
 
-    return (
-      allItems.find((item) => item.key === page) ||
-      allItems[0]
+
+  const activePage =
+    useMemo(
+      () => {
+
+        return (
+          NAV.find(
+            (item) =>
+              item.key ===
+              page
+          ) ||
+          NAV[0]
+        );
+
+      },
+      [page]
     );
-  }, [page]);
 
 
-  /*
-   * Props shared with pages.
-   */
   const pageProps = {
+
     location,
-    onNavigate: setPage,
+
+    onNavigate:
+      setPage,
+
   };
 
 
-  /* ============================================================
-     PAGE ROUTER
-     ============================================================ */
+  const renderPage =
+    () => {
 
-  const renderPage = () => {
-    switch (page) {
-
-      /* --------------------------------------------------------
-         DASHBOARD
-         -------------------------------------------------------- */
-
-      case "dashboard":
-        return (
-          <AdminDashboard
-            {...pageProps}
-          />
-        );
+      switch (page) {
 
 
-      /* --------------------------------------------------------
-         USER MANAGEMENT
-         -------------------------------------------------------- */
+        /* ================================================
+           DASHBOARD
+        ================================================ */
 
-      case "users":
-        return (
-          <ComingSoon
-            title="User Management"
-            description="Manage registered platform users, account status and access."
-          />
-        );
+        case "dashboard":
 
-
-      /* --------------------------------------------------------
-         AGENT MANAGEMENT
-         -------------------------------------------------------- */
-
-      case "agents":
-        return (
-          <AgentManagement
-            {...pageProps}
-          />
-        );
+          return (
+            <AdminDashboard
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         MEDICAL SUPERVISOR MANAGEMENT
-         --------------------------------------------------------
+        /* ================================================
+           AGENTS
+        ================================================ */
 
-         IMPORTANT:
+        case "agents":
 
-         This MUST remain SupervisorManagement.
-
-         Your project already contains:
-
-         src/pages/admin/SupervisorManagement.jsx
-
-         and that component contains the complete supervisor
-         functionality.
-
-         Do NOT change this to MedicalSupervisorManagement.
-         -------------------------------------------------------- */
-
-      case "supervisors":
-        return (
-          <SupervisorManagement
-            {...pageProps}
-          />
-        );
+          return (
+            <AgentManagement
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         ROLES & PERMISSIONS
-         -------------------------------------------------------- */
+        /* ================================================
+           SUPERVISORS
+        ================================================ */
 
-      case "roles":
-        return (
-          <RolesPermissions
-            {...pageProps}
-          />
-        );
+        case "supervisors":
 
-
-      /* --------------------------------------------------------
-         REPORT MANAGEMENT
-         -------------------------------------------------------- */
-
-      case "reports":
-        return (
-          <DiseaseReports
-            {...pageProps}
-          />
-        );
+          return (
+            <SupervisorManagement
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         WEEKLY MONITORING
-         -------------------------------------------------------- */
+        /* ================================================
+           REPORTS
+        ================================================ */
 
-      case "monitoring":
-        return (
-          <WeeklyMonitoring
-            {...pageProps}
-          />
-        );
+        case "reports":
 
-
-      /* --------------------------------------------------------
-         RISK MAP
-         -------------------------------------------------------- */
-
-      case "risk-map":
-        return (
-          <RiskMap
-            {...pageProps}
-          />
-        );
+          return (
+            <DiseaseReports
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         ANALYTICS
-         -------------------------------------------------------- */
+        /* ================================================
+           RISK MAP
+        ================================================ */
 
-      case "analytics":
-        return (
-          <ComingSoon
-            title="Analytics"
-            description="View system-wide administrative analytics."
-          />
-        );
+        case "risk-map":
 
-
-      /* --------------------------------------------------------
-         LOCATION MANAGEMENT
-         -------------------------------------------------------- */
-
-      case "location":
-        return (
-          <ComingSoon
-            title="Location Management"
-            description="Manage states, districts and taluk configuration."
-          />
-        );
+          return (
+            <RiskMap
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         SYSTEM HEALTH
-         -------------------------------------------------------- */
+        /* ================================================
+           ANALYTICS
+        ================================================ */
 
-      case "health":
-        return (
-          <ComingSoon
-            title="System Health"
-            description="Monitor API services, database, authentication and synchronization."
-          />
-        );
+        case "analytics":
 
-
-      /* --------------------------------------------------------
-         NOTIFICATIONS
-         -------------------------------------------------------- */
-
-      case "notifications":
-        return (
-          <NotificationsPanel
-            {...pageProps}
-          />
-        );
+          return (
+            <ComingSoon
+              title="Analytics"
+              description="View system-wide administrative analytics."
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         ACTIVITY LOGS
-         -------------------------------------------------------- */
+        /* ================================================
+           NOTIFICATIONS
+        ================================================ */
 
-      case "activity":
-        return (
-          <ActivityLogs
-            {...pageProps}
-          />
-        );
+        case "notifications":
 
-
-      /* --------------------------------------------------------
-         SETTINGS
-         -------------------------------------------------------- */
-
-      case "settings":
-        return (
-          <SettingsPage
-            {...pageProps}
-          />
-        );
+          return (
+            <NotificationsPanel
+              {...pageProps}
+            />
+          );
 
 
-      /* --------------------------------------------------------
-         FALLBACK
-         -------------------------------------------------------- */
+        /* ================================================
+           ACTIVITY
+        ================================================ */
 
-      default:
-        return (
-          <AdminDashboard
-            {...pageProps}
-          />
-        );
-    }
-  };
+        case "activity":
+
+          return (
+            <ActivityLogs
+              {...pageProps}
+            />
+          );
 
 
-  /* ============================================================
-     LAYOUT
-     ============================================================ */
+        /* ================================================
+           SETTINGS
+        ================================================ */
+
+        case "settings":
+
+          return (
+            <SettingsPage
+              {...pageProps}
+            />
+          );
+
+
+        /* ================================================
+           FALLBACK
+        ================================================ */
+
+        default:
+
+          return (
+            <AdminDashboard
+              {...pageProps}
+            />
+          );
+
+      }
+
+    };
+
 
   return (
+
     <AdminLayout
       nav={NAV}
       activeKey={page}
@@ -424,33 +332,43 @@ export default function AdminPortal({ onExit }) {
       onNavigate={setPage}
       onExit={onExit}
       location={location}
-      onLocationChange={setLocation}
+      onLocationChange={
+        setLocation
+      }
     >
+
       {renderPage()}
+
     </AdminLayout>
+
   );
+
 }
 
 
 /* ============================================================
    COMING SOON
-   ============================================================ */
+============================================================ */
 
 function ComingSoon({
   title,
   description,
 }) {
-  return (
-    <section className="rounded-[12px] border border-[#E1E8E3] bg-white p-[24px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
 
-      <h1 className="text-[20px] font-semibold text-[#10243A]">
+  return (
+
+    <section className="admin-coming-soon">
+
+      <h1>
         {title}
       </h1>
 
-      <p className="mt-[7px] text-[12px] text-[#718096]">
+      <p>
         {description}
       </p>
 
     </section>
+
   );
+
 }

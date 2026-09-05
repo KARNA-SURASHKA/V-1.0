@@ -1,27 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   Activity,
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
-  CalendarDays,
   ClipboardList,
   FileCheck2,
-  FileClock,
   FileText,
   Plus,
   ShieldCheck,
-  UserRound,
-  UsersRound,
   UserCog,
-  Database,
-  RefreshCw,
-  Bell,
-  CheckCircle2,
-  UserPlus,
-  Clock3,
-  Settings2,
+  UserRound,
 } from "lucide-react";
 
 import { api } from "../../api";
@@ -29,123 +23,157 @@ import KpiCard from "../../components/admin/KpiCard";
 
 import kodaguBanner from "../../assets/ui/admin-kodagu-banner.jpg";
 
-const REFERENCE_DATA = {
-  totalUsers: 1248,
-  activeAgents: 24,
-  supervisors: 4,
-  pendingActions: 7,
 
+/* ============================================================
+   REFERENCE VALUES
+============================================================ */
+
+const REFERENCE_DATA = {
   reportsSubmitted: 186,
   reportsReviewed: 179,
   pendingReview: 7,
+
+  activeAgents: 24,
+  activeAgentsReporting: 22,
+
+  supervisors: 4,
+
+  pendingActions: 7,
+
   weeklyReportingRate: 96,
 
-  systemHealth: 94,
-
   agentIssues: 3,
-  supervisorRequests: 2,
 
-  activeAgentsReporting: 22,
+  supervisorRequests: 2,
 };
 
-const REPORTING_VALUES = [68, 112, 154, 176, 198];
+
+const REPORTING_VALUES = [
+  68,
+  112,
+  154,
+  176,
+  198,
+];
+
+
+/* ============================================================
+   ADMIN DASHBOARD
+============================================================ */
 
 export default function AdminDashboard({
   location,
   onNavigate,
 }) {
-  const [stats, setStats] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [agentIssues, setAgentIssues] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const loadDashboard = useCallback(
-    async (showRefreshing = false) => {
-      if (showRefreshing) {
-        setRefreshing(true);
-      }
+  const [stats, setStats] =
+    useState(null);
+
+  const [activities, setActivities] =
+    useState([]);
+
+  const [agentIssues, setAgentIssues] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+
+  /* ==========================================================
+     LOAD DATA
+  ========================================================== */
+
+  const loadDashboard =
+    useCallback(async () => {
 
       try {
-        /*
-         * IMPORTANT:
-         * Do not call getMonitoring().
-         * That function does not exist in the supplied api.js.
-         *
-         * Each request is isolated so one unavailable admin endpoint
-         * cannot destroy the complete dashboard.
-         */
 
         const [
           statsResult,
-          notificationsResult,
           activityResult,
           issuesResult,
-        ] = await Promise.allSettled([
-          api.getAdminStats(),
-          api.listAdminNotifications(),
-          api.getActivityLogs(),
-          api.getAgentIssues(),
-        ]);
+        ] =
+          await Promise.allSettled([
 
-        if (statsResult.status === "fulfilled") {
-          setStats(statsResult.value || {});
-        } else {
-          setStats({});
-        }
+            api.getAdminStats(),
 
-        if (notificationsResult.status === "fulfilled") {
-          const value = notificationsResult.value;
+            api.getActivityLogs(),
 
-          setNotifications(
-            Array.isArray(value)
-              ? value
-              : Array.isArray(value?.items)
-                ? value.items
-                : []
+            api.getAgentIssues(),
+
+          ]);
+
+
+        if (
+          statsResult.status ===
+          "fulfilled"
+        ) {
+
+          setStats(
+            statsResult.value || {}
           );
+
         } else {
-          setNotifications([]);
+
+          setStats({});
+
         }
 
-        if (activityResult.status === "fulfilled") {
-          const value = activityResult.value;
+
+        if (
+          activityResult.status ===
+          "fulfilled"
+        ) {
+
+          const value =
+            activityResult.value;
 
           setActivities(
             Array.isArray(value)
               ? value
-              : Array.isArray(value?.items)
+              : Array.isArray(
+                  value?.items
+                )
                 ? value.items
                 : []
           );
-        } else {
-          setActivities([]);
+
         }
 
-        if (issuesResult.status === "fulfilled") {
-          const value = issuesResult.value;
+
+        if (
+          issuesResult.status ===
+          "fulfilled"
+        ) {
+
+          const value =
+            issuesResult.value;
 
           setAgentIssues(
             Array.isArray(value)
               ? value
-              : Array.isArray(value?.items)
+              : Array.isArray(
+                  value?.items
+                )
                 ? value.items
                 : []
           );
-        } else {
-          setAgentIssues([]);
+
         }
+
       } finally {
+
         setLoading(false);
-        setRefreshing(false);
+
       }
-    },
-    []
-  );
+
+    }, []);
+
 
   useEffect(() => {
-    loadDashboard(false);
+
+    loadDashboard();
+
   }, [
     loadDashboard,
     location?.state?.id,
@@ -153,319 +181,370 @@ export default function AdminDashboard({
     location?.taluk?.id,
   ]);
 
-  const data = useMemo(() => {
-    const source = stats || {};
 
-    return {
-      totalUsers:
-        source.total_users ??
-        source.users_count ??
-        source.totalUsers ??
-        REFERENCE_DATA.totalUsers,
+  /* ==========================================================
+     NORMALIZE API DATA
+  ========================================================== */
 
-      activeAgents:
-        source.total_agents ??
-        source.active_agents ??
-        source.activeAgents ??
-        REFERENCE_DATA.activeAgents,
+  const data =
+    useMemo(() => {
 
-      supervisors:
-        source.total_supervisors ??
-        source.medical_supervisors ??
-        source.supervisors ??
-        REFERENCE_DATA.supervisors,
+      const source =
+        stats || {};
 
-      pendingActions:
-        source.pending_actions ??
-        source.pendingActions ??
-        source.pending_reports_this_week ??
-        REFERENCE_DATA.pendingActions,
 
-      reportsSubmitted:
-        source.reports_submitted ??
-        source.reports_received_this_week ??
-        source.total_reports ??
-        source.reports_this_week ??
-        REFERENCE_DATA.reportsSubmitted,
+      return {
 
-      reportsReviewed:
-        source.reports_reviewed ??
-        source.reviewed_reports ??
-        REFERENCE_DATA.reportsReviewed,
+        reportsSubmitted:
+          source.reports_submitted ??
+          source.reports_received_this_week ??
+          source.total_reports ??
+          source.reports_this_week ??
+          REFERENCE_DATA.reportsSubmitted,
 
-      pendingReview:
-        source.pending_reports ??
-        source.pending_reports_this_week ??
-        REFERENCE_DATA.pendingReview,
 
-      weeklyReportingRate:
-        source.weekly_reporting_rate ??
-        source.reporting_coverage_percent ??
-        source.reporting_rate ??
-        REFERENCE_DATA.weeklyReportingRate,
+        reportsReviewed:
+          source.reports_reviewed ??
+          source.reviewed_reports ??
+          REFERENCE_DATA.reportsReviewed,
 
-      systemHealth:
-        source.system_health ??
-        source.systemHealth ??
-        REFERENCE_DATA.systemHealth,
 
-      activeAgentsReporting:
-        source.active_agents_reporting ??
-        source.submitted_agents_this_week ??
-        REFERENCE_DATA.activeAgentsReporting,
-    };
-  }, [stats]);
+        pendingReview:
+          source.pending_reports ??
+          source.pending_reports_this_week ??
+          REFERENCE_DATA.pendingReview,
 
-  const scope = useMemo(() => {
-    if (location?.taluk?.name) {
-      return `${location.taluk.name}, Karnataka`;
-    }
 
-    if (location?.district?.name) {
-      return `${location.district.name}, Karnataka`;
-    }
+        activeAgents:
+          source.total_agents ??
+          source.active_agents ??
+          source.activeAgents ??
+          REFERENCE_DATA.activeAgents,
 
-    if (location?.state?.name) {
-      return location.state.name;
-    }
 
-    return "Kodagu, Karnataka";
-  }, [location]);
+        activeAgentsReporting:
+          source.active_agents_reporting ??
+          source.submitted_agents_this_week ??
+          REFERENCE_DATA.activeAgentsReporting,
 
-  const pendingDiseaseReports = data.pendingReview;
+
+        supervisors:
+          source.total_supervisors ??
+          source.medical_supervisors ??
+          source.supervisors ??
+          REFERENCE_DATA.supervisors,
+
+
+        pendingActions:
+          source.pending_actions ??
+          source.pendingActions ??
+          source.pending_reports_this_week ??
+          REFERENCE_DATA.pendingActions,
+
+
+        weeklyReportingRate:
+          source.weekly_reporting_rate ??
+          source.reporting_coverage_percent ??
+          source.reporting_rate ??
+          REFERENCE_DATA.weeklyReportingRate,
+
+      };
+
+    }, [stats]);
+
+
+  /* ==========================================================
+     ISSUE COUNT
+  ========================================================== */
 
   const issueCount =
     agentIssues.length > 0
-      ? agentIssues.filter(
-          (item) =>
-            String(item.status || "")
-              .toUpperCase()
-              .includes("PENDING")
-        ).length || agentIssues.length
+      ? agentIssues.length
       : REFERENCE_DATA.agentIssues;
 
-  const activitiesForDisplay = useMemo(() => {
-    if (!activities.length) {
-      return [
-        {
-          time: "09:42 AM",
-          title: "Agent account created",
-          place: "Virajpet",
-          role: "Admin",
-        },
-        {
-          time: "09:31 AM",
-          title: "Disease report submitted",
-          place: "Kodagu",
-          role: "Field Agent",
-        },
-        {
-          time: "09:18 AM",
-          title: "Supervisor assignment updated",
-          place: "Madikeri",
-          role: "Admin",
-        },
-        {
-          time: "08:54 AM",
-          title: "Weekly report submitted",
-          place: "Somwarpet",
-          role: "Field Agent",
-        },
-        {
-          time: "08:30 AM",
-          title: "Supervisor account activated",
-          place: "Kodagu",
-          role: "Admin",
-        },
-      ];
-    }
 
-    return activities.slice(0, 5).map((item, index) => ({
-      time:
-        item.time ||
-        item.created_at
-          ? formatTime(item.time || item.created_at)
-          : ["09:42 AM", "09:31 AM", "09:18 AM", "08:54 AM", "08:30 AM"][
-              index
-            ],
+  /* ==========================================================
+     ACTIVITY DATA
+  ========================================================== */
 
-      title:
-        item.title ||
-        item.action ||
-        item.activity ||
-        "System activity",
+  const activitiesForDisplay =
+    useMemo(() => {
 
-      place:
-        item.place ||
-        item.location ||
-        item.taluk_name ||
-        item.district_name ||
-        "Kodagu",
+      if (!activities.length) {
 
-      role:
-        item.role ||
-        item.actor_role ||
-        item.performed_by_role ||
-        "Admin",
-    }));
-  }, [activities]);
+        return [
+
+          {
+            time: "09:42 AM",
+            title:
+              "Agent account created",
+            place: "Virajpet",
+          },
+
+          {
+            time: "09:31 AM",
+            title:
+              "Disease report submitted",
+            place: "Kodagu",
+          },
+
+          {
+            time: "09:18 AM",
+            title:
+              "Supervisor assignment updated",
+            place: "Madikeri",
+          },
+
+          {
+            time: "08:54 AM",
+            title:
+              "Weekly report submitted",
+            place: "Somwarpet",
+          },
+
+          {
+            time: "08:30 AM",
+            title:
+              "Supervisor account activated",
+            place: "Kodagu",
+          },
+
+        ];
+
+      }
+
+
+      return activities
+        .slice(0, 5)
+        .map(
+          (item, index) => ({
+
+            time:
+              item.time ||
+              item.created_at ||
+              [
+                "09:42 AM",
+                "09:31 AM",
+                "09:18 AM",
+                "08:54 AM",
+                "08:30 AM",
+              ][index],
+
+            title:
+              item.title ||
+              item.action ||
+              item.activity ||
+              "System activity",
+
+            place:
+              item.place ||
+              item.location ||
+              item.taluk_name ||
+              item.district_name ||
+              "Kodagu",
+
+          })
+        );
+
+    }, [activities]);
+
+
+  /* ==========================================================
+     LOADING
+  ========================================================== */
 
   if (loading) {
-    return <LoadingDashboard />;
+
+    return (
+      <div className="admin-dashboard-loading">
+
+        <div className="admin-loading-top" />
+
+        <div className="admin-loading-kpis">
+
+          {[1, 2, 3, 4].map(
+            (item) => (
+              <div
+                key={item}
+                className="admin-loading-card"
+              />
+            )
+          )}
+
+        </div>
+
+        <div className="admin-loading-middle" />
+
+        <div className="admin-loading-bottom" />
+
+      </div>
+    );
+
   }
 
+
   return (
-    <div className="w-full">
 
-      {/* =========================================================
-          TOP GREETING
-      ========================================================= */}
+    <div className="admin-dashboard">
 
-      <section className="mb-[22px] flex items-end justify-between">
 
-        <div>
-          <h1 className="text-[27px] leading-[1.15] font-semibold tracking-[-0.035em] text-[#10243A]">
+      {/* =====================================================
+          WELCOME AREA
+      ===================================================== */}
+
+      <section className="admin-welcome-row">
+
+
+        {/* GREETING */}
+
+        <div className="admin-welcome-copy">
+
+          <h1>
             Good Morning, Monish{" "}
-            <span className="inline-block text-[25px]">👋</span>
+            <span>👋</span>
           </h1>
 
-          <p className="mt-[8px] text-[12px] text-[#52627D]">
-            Here’s the current system-wide surveillance summary.
+          <p>
+            Here's the current
+            system-wide surveillance
+            summary.
           </p>
+
         </div>
 
-        <button
-          type="button"
-          onClick={() => loadDashboard(true)}
-          disabled={refreshing}
-          className="inline-flex h-[36px] items-center gap-2 rounded-[7px] border border-[#DDE4DE] bg-white px-[13px] text-[11px] font-medium text-[#52627D] shadow-[0_1px_2px_rgba(16,36,58,.02)] transition hover:bg-[#F8FAF8] disabled:opacity-60"
-        >
-          <RefreshCw
-            size={13}
-            className={refreshing ? "animate-spin" : ""}
+
+        {/* KODAGU IMAGE */}
+
+        <div className="admin-kodagu-banner">
+
+          <img
+            src={kodaguBanner}
+            alt="Kodagu Karnataka landscape"
           />
-          Refresh
-        </button>
-      </section>
 
-      {/* =========================================================
-          KODAGU BANNER
-      ========================================================= */}
-
-      <section className="relative mb-[16px] h-[112px] overflow-hidden rounded-[12px] border border-[#DDE7DD] bg-[#E8F3E7]">
-
-        <img
-          src={kodaguBanner}
-          alt="Kodagu Karnataka landscape"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-
-        <div className="absolute inset-y-0 left-0 w-[55%] bg-gradient-to-r from-[#E8F3E7] via-[#E8F3E7]/95 to-transparent" />
-
-        <div className="relative z-10 flex h-full items-center px-[20px]">
-
-          <div>
-            <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#087A32]">
-              CURRENT OPERATING REGION
-            </p>
-
-            <h2 className="mt-[6px] text-[16px] font-semibold text-[#10243A]">
-              Kodagu District
-            </h2>
-
-            <p className="mt-[4px] text-[8px] text-[#52627D]">
-              System-wide administrative monitoring
-            </p>
-          </div>
-
-          <div className="ml-auto mr-[14px] rounded-full bg-white/90 px-[11px] py-[6px] text-[8px] font-semibold text-[#52627D] shadow-[0_1px_3px_rgba(16,36,58,.08)]">
-            {scope}
-          </div>
         </div>
+
       </section>
 
-      {/* =========================================================
-          KPI ROW
-      ========================================================= */}
 
-      <section className="mb-[16px] grid grid-cols-4 gap-[16px]">
+      {/* =====================================================
+          KPI CARDS
+      ===================================================== */}
+
+      <section className="admin-kpi-grid">
+
 
         <KpiCard
-          label="TOTAL USERS"
-          value={formatNumber(data.totalUsers)}
-          note="Registered users"
-          trend="↑ 8.4% this month"
-          icon={UsersRound}
-          tone="green"
+          label="REPORTS THIS MONTH"
+          value={
+            data.reportsSubmitted
+          }
+          note="Submitted reports"
+          trend="↑ 21% vs last month"
+          icon={FileText}
+          tone="blue"
         />
+
 
         <KpiCard
           label="ACTIVE AGENTS"
-          value={data.activeAgents}
+          value={
+            data.activeAgents
+          }
           note="Currently operational"
           trend={`${data.activeAgentsReporting} reporting this week`}
           icon={UserRound}
           tone="green"
         />
 
+
         <KpiCard
           label="MEDICAL SUPERVISORS"
-          value={data.supervisors}
+          value={
+            data.supervisors
+          }
           note="District supervisors"
           trend="All assignments active"
           icon={ShieldCheck}
           tone="green"
         />
 
+
         <KpiCard
           label="PENDING ACTIONS"
-          value={data.pendingActions}
+          value={
+            data.pendingActions
+          }
           note="Require administrator attention"
           trend="Requires administrator attention"
-          icon={Clock3}
+          icon={AlertCircle}
           tone="amber"
         />
 
       </section>
 
-      {/* =========================================================
-          SYSTEM OVERVIEW + PENDING ACTIONS
-      ========================================================= */}
 
-      <section className="mb-[16px] grid grid-cols-[1.31fr_1fr] gap-[16px]">
+      {/* =====================================================
+          REPORT OVERVIEW + PENDING ACTIONS
+      ===================================================== */}
 
-        {/* SYSTEM OVERVIEW */}
+      <section className="admin-middle-grid">
 
-        <DashboardPanel
-          title="SYSTEM OVERVIEW"
-          action="View Full Overview"
-          onAction={() => onNavigate("monitoring")}
-        >
 
-          <div className="grid h-[168px] grid-cols-[235px_1fr]">
+        {/* ===================================================
+            REPORT OVERVIEW
+        =================================================== */}
 
-            {/* LEFT METRICS */}
+        <section className="admin-panel admin-report-panel">
 
-            <div className="border-r border-[#E8EEEA] pr-[18px]">
+          <PanelTitle
+            title="REPORT OVERVIEW"
+          />
+
+
+          <div className="admin-report-body">
+
+
+            {/* METRICS */}
+
+            <div className="admin-overview-metrics">
+
 
               <OverviewMetric
-                icon={FileText}
+                icon={UserRound}
                 label="Reports Submitted"
-                value={data.reportsSubmitted}
+                value={
+                  data.reportsSubmitted
+                }
               />
+
 
               <OverviewMetric
                 icon={FileCheck2}
                 label="Reports Reviewed"
-                value={data.reportsReviewed}
+                value={
+                  data.reportsReviewed
+                }
               />
 
+
               <OverviewMetric
-                icon={Clock3}
+                icon={AlertCircle}
                 label="Pending Review"
-                value={data.pendingReview}
-                tone="amber"
+                value={
+                  data.pendingReview
+                }
+                tone="orange"
               />
+
+
+              <OverviewMetric
+                icon={Activity}
+                label="Rejected Reports"
+                value="3"
+                tone="red"
+              />
+
 
               <OverviewMetric
                 icon={Activity}
@@ -476,13 +555,23 @@ export default function AdminDashboard({
 
             </div>
 
+
             {/* CHART */}
 
-            <div className="pl-[20px]">
+            <div className="admin-report-chart">
 
-              <p className="mb-[5px] text-[9px] font-medium text-[#52627D]">
-                Reporting Activity (Last 5 Weeks)
-              </p>
+              <div className="admin-chart-title">
+
+                <strong>
+                  Reporting Activity
+                </strong>
+
+                <span>
+                  (Last 5 Weeks)
+                </span>
+
+              </div>
+
 
               <ReportingChart />
 
@@ -490,22 +579,42 @@ export default function AdminDashboard({
 
           </div>
 
-        </DashboardPanel>
 
-        {/* PENDING ACTIONS */}
+          <PanelFooter
+            label="View Full Overview"
+            onClick={() =>
+              onNavigate("monitoring")
+            }
+          />
 
-        <DashboardPanel title="PENDING ACTIONS">
+        </section>
 
-          <div className="space-y-[8px]">
+
+        {/* ===================================================
+            PENDING ACTIONS
+        =================================================== */}
+
+        <section className="admin-panel admin-pending-panel">
+
+          <PanelTitle
+            title="PENDING ACTIONS"
+          />
+
+
+          <div className="admin-pending-list">
+
 
             <PendingAction
               icon={FileText}
               tone="orange"
-              title={`${pendingDiseaseReports} Disease Reports`}
+              title={`${data.pendingReview} Disease Reports`}
               subtitle="Awaiting medical review"
               action="View Reports"
-              onClick={() => onNavigate("reports")}
+              onClick={() =>
+                onNavigate("reports")
+              }
             />
+
 
             <PendingAction
               icon={UserRound}
@@ -513,8 +622,11 @@ export default function AdminDashboard({
               title={`${issueCount} Agent Issues`}
               subtitle="Need administrator attention"
               action="Manage Agents"
-              onClick={() => onNavigate("agents")}
+              onClick={() =>
+                onNavigate("agents")
+              }
             />
+
 
             <PendingAction
               icon={UserCog}
@@ -522,232 +634,258 @@ export default function AdminDashboard({
               title={`${REFERENCE_DATA.supervisorRequests} Supervisor Requests`}
               subtitle="Awaiting approval"
               action="Manage Supervisors"
-              onClick={() => onNavigate("supervisors")}
+              onClick={() =>
+                onNavigate("supervisors")
+              }
             />
 
           </div>
 
-          <div className="flex justify-center pt-[10px]">
 
-            <button
-              type="button"
-              onClick={() => onNavigate("reports")}
-              className="inline-flex items-center gap-1 rounded-[7px] border border-[#CFE1D3] px-[13px] py-[7px] text-[10px] font-semibold text-[#087A32] hover:bg-[#F5FAF6]"
-            >
-              View All Actions
-              <ArrowRight size={12} />
-            </button>
+          <PanelFooter
+            label="View All Actions"
+            onClick={() =>
+              onNavigate("reports")
+            }
+          />
 
-          </div>
-
-        </DashboardPanel>
+        </section>
 
       </section>
 
-      {/* =========================================================
-          LOWER DASHBOARD
-      ========================================================= */}
 
-      <section className="grid grid-cols-[1.05fr_1.18fr_.82fr_.82fr] gap-[16px]">
+      {/* =====================================================
+          LOWER ROW
+      ===================================================== */}
 
-        {/* SYSTEM HEALTH */}
+      <section className="admin-bottom-grid">
 
-        <DashboardPanel title="SYSTEM HEALTH">
 
-          <div className="flex h-[198px] items-center">
+        {/* ===================================================
+            SURVEILLANCE PULSE
+        =================================================== */}
 
-            <div className="flex w-[124px] shrink-0 justify-center border-r border-[#E8EEEA] pr-[16px]">
+        <section className="admin-panel admin-pulse-panel">
 
-              <HealthRing value={data.systemHealth} />
+          <PanelTitle
+            title="SURVEILLANCE PULSE"
+            icon={Activity}
+          />
+
+
+          <div className="admin-pulse-content">
+
+            {activitiesForDisplay.map(
+              (item, index) => (
+
+                <PulseItem
+                  key={`${item.time}-${index}`}
+                  {...item}
+                />
+
+              )
+            )}
+
+          </div>
+
+
+          <PanelFooter
+            label="View All Activity"
+            onClick={() =>
+              onNavigate("activity")
+            }
+          />
+
+        </section>
+
+
+        {/* ===================================================
+            RISK SUMMARY
+        =================================================== */}
+
+        <section className="admin-panel admin-risk-panel">
+
+          <PanelTitle
+            title="RISK SUMMARY"
+          />
+
+
+          <div className="admin-risk-content">
+
+            <RiskDonut />
+
+
+            <div className="admin-risk-legend">
+
+              <RiskLegend
+                color="#168B47"
+                title="Low Risk"
+                value="8 Taluks (32%)"
+              />
+
+              <RiskLegend
+                color="#F4B400"
+                title="Moderate Risk"
+                value="10 Taluks (40%)"
+              />
+
+              <RiskLegend
+                color="#F66A16"
+                title="High Risk"
+                value="5 Taluks (20%)"
+              />
+
+              <RiskLegend
+                color="#D9232E"
+                title="Very High Risk"
+                value="2 Taluks (8%)"
+              />
 
             </div>
 
-            <div className="flex-1 pl-[15px]">
-
-              <HealthStatus
-                label="API Services"
-                status="Operational"
-              />
-
-              <HealthStatus
-                label="Database"
-                status="Operational"
-              />
-
-              <HealthStatus
-                label="Data Synchronization"
-                status="Operational"
-              />
-
-              <HealthStatus
-                label="Authentication"
-                status="Operational"
-              />
-
-              <HealthStatus
-                label="Backup"
-                status="Up to date"
-              />
-
-            </div>
-
           </div>
 
-          <BottomButton
-            onClick={() => onNavigate("health")}
-          >
-            View System Health
-          </BottomButton>
 
-        </DashboardPanel>
+          <PanelFooter
+            label="View Risk Map"
+            onClick={() =>
+              onNavigate("risk-map")
+            }
+          />
 
-        {/* RECENT ACTIVITY */}
+        </section>
 
-        <DashboardPanel title="RECENT ACTIVITY">
 
-          <div className="h-[198px]">
+        {/* ===================================================
+            QUICK ACTIONS
+        =================================================== */}
 
-            {activitiesForDisplay.map((item, index) => (
-              <ActivityItem
-                key={`${item.time}-${index}`}
-                {...item}
-              />
-            ))}
+        <section className="admin-panel admin-quick-panel">
 
-          </div>
+          <PanelTitle
+            title="QUICK ACTIONS"
+          />
 
-          <BottomButton
-            onClick={() => onNavigate("activity")}
-          >
-            View All Activity
-          </BottomButton>
 
-        </DashboardPanel>
+          <div className="admin-quick-actions">
 
-        {/* SYSTEM ALERTS */}
-
-        <DashboardPanel title="SYSTEM ALERTS">
-
-          <div className="h-[198px] space-y-[9px]">
-
-            <SystemAlert
-              tone="high"
-              level="HIGH"
-              text="3 agents have missed this week’s reporting"
-            />
-
-            <SystemAlert
-              tone="medium"
-              level="MEDIUM"
-              text="2 supervisor assignments require attention"
-            />
-
-            <SystemAlert
-              tone="info"
-              level="INFO"
-              text="Weekly surveillance report generated successfully"
-            />
-
-          </div>
-
-          <BottomButton
-            onClick={() => onNavigate("notifications")}
-          >
-            View All Alerts
-          </BottomButton>
-
-        </DashboardPanel>
-
-        {/* QUICK ACTIONS */}
-
-        <DashboardPanel title="QUICK ACTIONS">
-
-          <div className="h-[198px] space-y-[9px]">
 
             <QuickAction
               icon={Plus}
               label="Add Agent"
-              onClick={() => onNavigate("agents")}
+              onClick={() =>
+                onNavigate("agents")
+              }
             />
+
 
             <QuickAction
               icon={Plus}
               label="Add Medical Supervisor"
-              onClick={() => onNavigate("supervisors")}
+              onClick={() =>
+                onNavigate("supervisors")
+              }
             />
+
 
             <QuickAction
               icon={ClipboardList}
               label="Review Reports"
-              onClick={() => onNavigate("reports")}
+              onClick={() =>
+                onNavigate("reports")
+              }
             />
+
 
             <QuickAction
               icon={FileText}
               label="Activity Logs"
-              onClick={() => onNavigate("activity")}
+              onClick={() =>
+                onNavigate("activity")
+              }
             />
 
           </div>
 
-        </DashboardPanel>
+        </section>
 
       </section>
 
-      {/* Keep notifications connected to the dashboard without
-          adding visual clutter to the reference layout. */}
+    </div>
 
-      <span className="sr-only">
-        {notifications.map((item, index) =>
-          `${item.title || "Notification"} ${index}`
-        )}
-      </span>
+  );
+
+}
+
+
+/* ============================================================
+   PANEL TITLE
+============================================================ */
+
+function PanelTitle({
+  title,
+  icon: Icon,
+}) {
+
+  return (
+
+    <div className="admin-panel-title">
+
+      {Icon && (
+        <Icon
+          size={18}
+          strokeWidth={1.8}
+        />
+      )}
+
+      <h2>
+        {title}
+      </h2>
 
     </div>
+
   );
+
 }
 
-/* ===============================================================
-   PANEL
-=============================================================== */
 
-function DashboardPanel({
-  title,
-  action,
-  onAction,
-  children,
+/* ============================================================
+   PANEL FOOTER
+============================================================ */
+
+function PanelFooter({
+  label,
+  onClick,
 }) {
+
   return (
-    <section className="min-w-0 overflow-hidden rounded-[12px] border border-[#E1E8E3] bg-white p-[16px] shadow-[0_2px_7px_rgba(31,49,68,.035)]">
 
-      <div className="mb-[10px] flex items-center justify-between">
+    <div className="admin-panel-footer">
 
-        <h2 className="text-[11px] font-bold tracking-[0.04em] text-[#10243A]">
-          {title}
-        </h2>
+      <button
+        type="button"
+        onClick={onClick}
+      >
 
-        {action && (
-          <button
-            type="button"
-            onClick={onAction}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-[#087A32] hover:underline"
-          >
-            {action}
-            <ArrowRight size={12} />
-          </button>
-        )}
+        {label}
 
-      </div>
+        <ArrowRight
+          size={15}
+          strokeWidth={1.8}
+        />
 
-      {children}
+      </button>
 
-    </section>
+    </div>
+
   );
+
 }
 
-/* ===============================================================
+
+/* ============================================================
    OVERVIEW METRIC
-=============================================================== */
+============================================================ */
 
 function OverviewMetric({
   icon: Icon,
@@ -755,103 +893,163 @@ function OverviewMetric({
   value,
   tone = "default",
 }) {
-  const valueClass =
-    tone === "amber"
-      ? "text-[#E0642A]"
-      : tone === "green"
-        ? "text-[#087A32]"
-        : "text-[#10243A]";
 
   return (
-    <div className="flex h-[40px] items-center justify-between">
 
-      <div className="flex min-w-0 items-center gap-[10px]">
+    <div className="admin-overview-metric">
 
-        <div className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-[#EFF8F1] text-[#087A32]">
-          <Icon size={14} strokeWidth={1.7} />
+      <div className="admin-overview-left">
+
+        <div
+          className={`
+            admin-overview-icon
+            ${
+              tone === "orange"
+                ? "orange"
+                : tone === "red"
+                  ? "red"
+                  : tone === "green"
+                    ? "green"
+                    : ""
+            }
+          `}
+        >
+
+          <Icon
+            size={16}
+            strokeWidth={1.7}
+          />
+
         </div>
 
-        <span className="truncate text-[9px] text-[#52627D]">
+
+        <span>
           {label}
         </span>
 
       </div>
 
+
       <strong
-        className={`text-[16px] font-semibold ${valueClass}`}
+        className={`
+          ${
+            tone === "orange"
+              ? "orange"
+              : tone === "red"
+                ? "red"
+                : tone === "green"
+                  ? "green"
+                  : ""
+          }
+        `}
       >
         {value}
       </strong>
 
     </div>
+
   );
+
 }
 
-/* ===============================================================
+
+/* ============================================================
    REPORTING CHART
-=============================================================== */
+============================================================ */
 
 function ReportingChart() {
-  const values = REPORTING_VALUES;
 
-  const width = 440;
-  const height = 138;
+  const width = 500;
 
-  const left = 18;
-  const right = 8;
-  const top = 18;
-  const bottom = 28;
+  const height = 160;
 
-  const usableWidth = width - left - right;
-  const usableHeight = height - top - bottom;
+  const left = 38;
+
+  const right = 10;
+
+  const top = 12;
+
+  const bottom = 27;
 
   const max = 240;
 
-  const points = values.map((value, index) => {
-    const x =
-      left +
-      (index / (values.length - 1)) *
-        usableWidth;
 
-    const y =
-      top +
-      usableHeight -
-      (value / max) * usableHeight;
+  const usableWidth =
+    width - left - right;
 
-    return {
-      x,
-      y,
-      value,
-    };
-  });
+  const usableHeight =
+    height - top - bottom;
 
-  const polyline = points
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ");
 
-  const area = [
+  const points =
+    REPORTING_VALUES.map(
+      (value, index) => {
+
+        const x =
+          left +
+          (index /
+            (REPORTING_VALUES.length - 1)) *
+            usableWidth;
+
+
+        const y =
+          top +
+          usableHeight -
+          (value / max) *
+            usableHeight;
+
+
+        return {
+          x,
+          y,
+        };
+
+      }
+    );
+
+
+  const polyline =
+    points
+      .map(
+        (point) =>
+          `${point.x},${point.y}`
+      )
+      .join(" ");
+
+
+  const areaPoints = [
     `${points[0].x},${height - bottom}`,
+
     ...points.map(
-      (point) => `${point.x},${point.y}`
+      (point) =>
+        `${point.x},${point.y}`
     ),
-    `${points[points.length - 1].x},${height - bottom}`,
+
+    `${points.at(-1).x},${height - bottom}`,
   ].join(" ");
 
+
   return (
+
     <svg
+      className="admin-reporting-chart"
       viewBox={`0 0 ${width} ${height}`}
-      className="h-[138px] w-full"
       preserveAspectRatio="none"
     >
 
+
       {[0, 60, 120, 180, 240].map(
         (value) => {
+
           const y =
             top +
             usableHeight -
-            (value / max) * usableHeight;
+            (value / max) *
+              usableHeight;
+
 
           return (
+
             <g key={value}>
 
               <line
@@ -859,70 +1057,84 @@ function ReportingChart() {
                 x2={width - right}
                 y1={y}
                 y2={y}
-                stroke="#E9EFEB"
+                stroke="#E7ECE9"
                 strokeWidth="1"
               />
+
 
               <text
                 x="0"
                 y={y + 3}
-                fontSize="7"
-                fill="#8792A0"
+                fontSize="9"
+                fill="#788597"
               >
                 {value}
               </text>
 
             </g>
+
           );
+
         }
       )}
 
+
       <polygon
-        points={area}
-        fill="rgba(11,122,51,0.08)"
+        points={areaPoints}
+        fill="rgba(22,139,71,.08)"
       />
+
 
       <polyline
         points={polyline}
         fill="none"
-        stroke="#087A32"
+        stroke="#168B47"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
 
-      {points.map((point, index) => (
-        <g key={index}>
 
-          <circle
-            cx={point.x}
-            cy={point.y}
-            r="3.2"
-            fill="white"
-            stroke="#087A32"
-            strokeWidth="1.7"
-          />
+      {points.map(
+        (point, index) => (
 
-          <text
-            x={point.x}
-            y={height - 9}
-            textAnchor="middle"
-            fontSize="7"
-            fill="#7A8598"
-          >
-            W{index + 1}
-          </text>
+          <g key={index}>
 
-        </g>
-      ))}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="3.5"
+              fill="#FFFFFF"
+              stroke="#168B47"
+              strokeWidth="2"
+            />
+
+
+            <text
+              x={point.x}
+              y={height - 8}
+              textAnchor="middle"
+              fontSize="9"
+              fill="#6E7B8E"
+            >
+              W{index + 1}
+            </text>
+
+          </g>
+
+        )
+      )}
 
     </svg>
+
   );
+
 }
 
-/* ===============================================================
+
+/* ============================================================
    PENDING ACTION
-=============================================================== */
+============================================================ */
 
 function PendingAction({
   icon: Icon,
@@ -932,374 +1144,349 @@ function PendingAction({
   action,
   onClick,
 }) {
-  const styles = {
+
+  const style = {
+
     orange: {
-      background: "#FFF5EC",
-      color: "#E0642A",
+      background: "#FFF0E8",
+      color: "#F05A18",
     },
 
     red: {
-      background: "#FFF0F0",
-      color: "#C62828",
+      background: "#FFF0F1",
+      color: "#D92A36",
     },
 
     blue: {
-      background: "#F0F3FF",
-      color: "#536CC8",
+      background: "#F0EDFF",
+      color: "#6755D9",
     },
-  };
 
-  const selected =
-    styles[tone] || styles.orange;
+  }[tone];
+
 
   return (
-    <div className="flex h-[48px] items-center gap-[10px] rounded-[9px] border border-[#E7ECE8] px-[10px]">
+
+    <div className="admin-pending-action">
 
       <div
-        className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full"
+        className="admin-pending-icon"
         style={{
           backgroundColor:
-            selected.background,
-          color: selected.color,
+            style.background,
+          color:
+            style.color,
         }}
       >
-        <Icon size={16} strokeWidth={1.7} />
+
+        <Icon
+          size={19}
+          strokeWidth={1.7}
+        />
+
       </div>
 
-      <div className="min-w-0 flex-1">
 
-        <p className="truncate text-[10px] font-semibold text-[#10243A]">
+      <div className="admin-pending-copy">
+
+        <strong>
           {title}
-        </p>
+        </strong>
 
-        <p className="mt-[2px] truncate text-[8px] text-[#718096]">
+        <span>
           {subtitle}
-        </p>
+        </span>
 
       </div>
+
 
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex shrink-0 items-center gap-1 text-[9px] font-medium text-[#087A32]"
       >
+
         {action}
-        <ArrowRight size={11} />
+
+        <ArrowRight
+          size={15}
+        />
+
       </button>
 
     </div>
+
   );
+
 }
 
-/* ===============================================================
-   HEALTH RING
-=============================================================== */
 
-function HealthRing({ value }) {
-  const radius = 43;
-  const circumference =
-    2 * Math.PI * radius;
+/* ============================================================
+   SURVEILLANCE PULSE ITEM
+============================================================ */
 
-  const progress =
-    (value / 100) * circumference;
+function PulseItem({
+  time,
+  title,
+  place,
+}) {
 
   return (
-    <div className="relative h-[105px] w-[105px]">
+
+    <div className="admin-pulse-item">
+
+
+      <div className="admin-pulse-time">
+
+        <span className="admin-pulse-dot" />
+
+        <span>
+          {formatTime(time)}
+        </span>
+
+      </div>
+
+
+      <div className="admin-pulse-vertical" />
+
+
+      <div className="admin-pulse-description">
+
+        <strong>
+          {title}
+        </strong>
+
+        <span>
+          {place}
+        </span>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+/* ============================================================
+   RISK DONUT
+============================================================ */
+
+function RiskDonut() {
+
+  return (
+
+    <div className="admin-risk-donut-wrapper">
 
       <svg
-        viewBox="0 0 110 110"
-        className="h-full w-full -rotate-90"
+        viewBox="0 0 120 120"
+        className="admin-risk-donut"
       >
 
         <circle
-          cx="55"
-          cy="55"
-          r={radius}
+          cx="60"
+          cy="60"
+          r="42"
           fill="none"
-          stroke="#E7F0E9"
-          strokeWidth="8"
+          stroke="#EEF1EE"
+          strokeWidth="18"
         />
 
+
         <circle
-          cx="55"
-          cy="55"
-          r={radius}
+          cx="60"
+          cy="60"
+          r="42"
           fill="none"
-          stroke="#087A32"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={`${progress} ${circumference}`}
+          stroke="#168B47"
+          strokeWidth="18"
+          strokeDasharray="84.44 263.89"
+          strokeDashoffset="0"
+          transform="rotate(-90 60 60)"
+        />
+
+
+        <circle
+          cx="60"
+          cy="60"
+          r="42"
+          fill="none"
+          stroke="#F4B400"
+          strokeWidth="18"
+          strokeDasharray="105.56 263.89"
+          strokeDashoffset="-84.44"
+          transform="rotate(-90 60 60)"
+        />
+
+
+        <circle
+          cx="60"
+          cy="60"
+          r="42"
+          fill="none"
+          stroke="#F66A16"
+          strokeWidth="18"
+          strokeDasharray="52.78 263.89"
+          strokeDashoffset="-190"
+          transform="rotate(-90 60 60)"
+        />
+
+
+        <circle
+          cx="60"
+          cy="60"
+          r="42"
+          fill="none"
+          stroke="#D9232E"
+          strokeWidth="18"
+          strokeDasharray="21.11 263.89"
+          strokeDashoffset="-242.78"
+          transform="rotate(-90 60 60)"
         />
 
       </svg>
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-
-        <span className="text-[24px] font-semibold leading-none text-[#10243A]">
-          {value}%
-        </span>
-
-        <span className="mt-[4px] text-[8px] text-[#718096]">
-          System Operational
-        </span>
-
-      </div>
-
     </div>
+
   );
+
 }
 
-/* ===============================================================
-   HEALTH STATUS
-=============================================================== */
 
-function HealthStatus({
-  label,
-  status,
-}) {
-  return (
-    <div className="flex h-[31px] items-center justify-between gap-2">
+/* ============================================================
+   RISK LEGEND
+============================================================ */
 
-      <span className="truncate text-[8px] text-[#52627D]">
-        {label}
-      </span>
-
-      <span className="inline-flex shrink-0 items-center gap-[5px] text-[8px] font-medium text-[#087A32]">
-
-        <span className="h-[5px] w-[5px] rounded-full bg-[#087A32]" />
-
-        {status}
-
-      </span>
-
-    </div>
-  );
-}
-
-/* ===============================================================
-   ACTIVITY
-=============================================================== */
-
-function ActivityItem({
-  time,
+function RiskLegend({
+  color,
   title,
-  place,
-  role,
+  value,
 }) {
+
   return (
-    <div className="grid h-[39px] grid-cols-[53px_1fr_auto] items-center gap-[7px] border-b border-[#F0F3F1] last:border-b-0">
 
-      <span className="text-[7px] text-[#7A8598]">
-        {time}
-      </span>
+    <div className="admin-risk-item">
 
-      <div className="min-w-0">
+      <span
+        className="admin-risk-dot"
+        style={{
+          backgroundColor:
+            color,
+        }}
+      />
 
-        <p className="truncate text-[8px] font-semibold text-[#10243A]">
+
+      <div>
+
+        <strong>
           {title}
-        </p>
+        </strong>
 
-        <p className="truncate text-[7px] text-[#7A8598]">
-          {place}
-        </p>
-
-      </div>
-
-      <span className="text-[7px] text-[#7A8598]">
-        {role}
-      </span>
-
-    </div>
-  );
-}
-
-/* ===============================================================
-   ALERT
-=============================================================== */
-
-function SystemAlert({
-  tone,
-  level,
-  text,
-}) {
-  const styles = {
-    high: {
-      wrapper:
-        "border-[#F2D5D5] bg-[#FFF5F5]",
-      icon:
-        "text-[#C62828]",
-      level:
-        "text-[#C62828]",
-    },
-
-    medium: {
-      wrapper:
-        "border-[#F1E0B7] bg-[#FFF9EC]",
-      icon:
-        "text-[#D28A00]",
-      level:
-        "text-[#D28A00]",
-    },
-
-    info: {
-      wrapper:
-        "border-[#D8E2F4] bg-[#F4F8FF]",
-      icon:
-        "text-[#3670C8]",
-      level:
-        "text-[#3670C8]",
-    },
-  };
-
-  const selected =
-    styles[tone] || styles.info;
-
-  const Icon =
-    tone === "high"
-      ? AlertCircle
-      : tone === "medium"
-        ? AlertTriangle
-        : Bell;
-
-  return (
-    <div
-      className={`rounded-[7px] border px-[8px] py-[7px] ${selected.wrapper}`}
-    >
-
-      <div className="flex items-start gap-[7px]">
-
-        <Icon
-          size={15}
-          className={`mt-[1px] shrink-0 ${selected.icon}`}
-        />
-
-        <div>
-
-          <p
-            className={`text-[8px] font-bold tracking-[0.04em] ${selected.level}`}
-          >
-            {level}
-          </p>
-
-          <p className="mt-[2px] text-[8px] leading-[12px] text-[#26334A]">
-            {text}
-          </p>
-
-        </div>
+        <span>
+          {value}
+        </span>
 
       </div>
 
     </div>
+
   );
+
 }
 
-/* ===============================================================
+
+/* ============================================================
    QUICK ACTION
-=============================================================== */
+============================================================ */
 
 function QuickAction({
   icon: Icon,
   label,
   onClick,
 }) {
+
   return (
+
     <button
       type="button"
+      className="admin-quick-action"
       onClick={onClick}
-      className="flex h-[39px] w-full items-center gap-[9px] rounded-[7px] border border-[#DFE9E1] bg-[#F7FBF8] px-[10px] text-left transition hover:border-[#BFD7C5] hover:bg-[#F0F8F2]"
     >
 
       <Icon
-        size={16}
-        className="text-[#087A32]"
-        strokeWidth={1.7}
+        size={21}
+        strokeWidth={1.6}
       />
 
-      <span className="text-[9px] font-semibold text-[#087A32]">
+      <span>
         {label}
       </span>
 
     </button>
+
   );
+
 }
 
-/* ===============================================================
-   BOTTOM BUTTON
-=============================================================== */
 
-function BottomButton({
-  children,
-  onClick,
-}) {
-  return (
-    <div className="flex justify-center border-t border-[#EDF1EE] pt-[10px]">
-
-      <button
-        type="button"
-        onClick={onClick}
-        className="inline-flex items-center gap-1 rounded-[7px] border border-[#CFE1D3] px-[13px] py-[7px] text-[9px] font-semibold text-[#087A32] hover:bg-[#F5FAF6]"
-      >
-        {children}
-        <ArrowRight size={11} />
-      </button>
-
-    </div>
-  );
-}
-
-/* ===============================================================
-   LOADING
-=============================================================== */
-
-function LoadingDashboard() {
-  return (
-    <div className="space-y-[16px]">
-
-      <div className="h-[45px] animate-pulse rounded-[8px] bg-[#EEF3EF]" />
-
-      <div className="h-[112px] animate-pulse rounded-[12px] bg-[#E8F1E8]" />
-
-      <div className="grid grid-cols-4 gap-[16px]">
-
-        {[1, 2, 3, 4].map(
-          (item) => (
-            <div
-              key={item}
-              className="h-[114px] animate-pulse rounded-[12px] bg-white"
-            />
-          )
-        )}
-
-      </div>
-
-      <div className="h-[212px] animate-pulse rounded-[12px] bg-white" />
-
-    </div>
-  );
-}
-
-/* ===============================================================
-   HELPERS
-=============================================================== */
-
-function formatNumber(value) {
-  return new Intl.NumberFormat(
-    "en-IN"
-  ).format(Number(value) || 0);
-}
+/* ============================================================
+   TIME FORMAT
+============================================================ */
 
 function formatTime(value) {
-  const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
+  if (!value) {
+    return "";
   }
 
-  return date.toLocaleTimeString(
-    "en-US",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
+
+  if (
+    typeof value ===
+    "string"
+  ) {
+
+    if (
+      value.includes("AM") ||
+      value.includes("PM")
+    ) {
+
+      return value;
+
     }
-  );
+
+  }
+
+
+  try {
+
+    const date =
+      new Date(value);
+
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return String(value);
+
+    }
+
+
+    return new Intl.DateTimeFormat(
+      "en-US",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }
+    ).format(date);
+
+  } catch {
+
+    return String(value);
+
+  }
+
 }

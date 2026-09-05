@@ -1,8 +1,16 @@
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 
-import AdminSidebar from "../../components/admin/AdminSidebar";
-import AdminHeader from "../../components/admin/AdminHeader";
-import AdminLocationSelector from "../../components/admin/AdminLocationSelector";
+import AdminSidebar
+  from "../../components/admin/AdminSidebar";
+
+import AdminHeader
+  from "../../components/admin/AdminHeader";
+
+import AdminLocationSelector
+  from "../../components/admin/AdminLocationSelector";
+
 
 export default function AdminLayout({
   nav,
@@ -14,13 +22,18 @@ export default function AdminLayout({
   onLocationChange,
   children,
 }) {
+
   const [
     locationOpen,
     setLocationOpen,
-  ] = useState(false);
+  ] =
+    useState(false);
+
 
   return (
-    <div className="min-h-screen bg-[#FCFAF6] text-[#10243A]">
+
+    <div className="admin-shell">
+
 
       <AdminSidebar
         nav={nav}
@@ -29,7 +42,9 @@ export default function AdminLayout({
         onExit={onExit}
       />
 
-      <main className="min-h-screen lg:ml-[244px]">
+
+      <main className="admin-main">
+
 
         <AdminHeader
           activePage={activePage}
@@ -38,6 +53,7 @@ export default function AdminLayout({
             setLocationOpen(true)
           }
         />
+
 
         <AdminLocationSelector
           value={location}
@@ -48,9 +64,10 @@ export default function AdminLayout({
           }
         />
 
-        <div className="px-[20px] py-[42px]">
 
-          <div className="mx-auto w-full max-w-[1254px]">
+        <div className="admin-content">
+
+          <div className="admin-content-inner">
 
             {children}
 
@@ -61,5 +78,7 @@ export default function AdminLayout({
       </main>
 
     </div>
+
   );
+
 }
