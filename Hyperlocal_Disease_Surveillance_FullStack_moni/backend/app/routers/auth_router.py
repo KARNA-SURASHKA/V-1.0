@@ -1,172 +1,112 @@
+# backend/app/routers/auth_router.py
+"""FastAPI router for authentication.
+
+This router contains the ``/login`` endpoint and all authentication related
+utilities that the rest of the application imports via ``from .auth_router
+import router``.
+
+All logic uses Firebase Admin SDK to verify the Firebase ID token sent in
+the ``Authorization`` header. Role-based access control uses the ``role``
+column on the local ``User`` row (keyed by ``firebase_uid``), not Firebase
+custom claims — Firebase handles authentication only.
+"""
+
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from firebase_admin import credentials, auth as firebase_auth, initialize_app
+from firebase_admin.auth import ExpiredIdTokenError, InvalidIdTokenError, RevokedIdTokenError
+
+from ..database import get_db
+from ..models import User
 from sqlalchemy.orm import Session
 
-from .. import models, schemas, auth
-from ..database import get_db
-
-
-# ============================================================
-# ROUTER
-# ============================================================
-
-router = APIRouter(
-    prefix="/auth",
-    tags=["auth"],
-)
-
-
-# ============================================================
-# LOGIN
-# ============================================================
-
-@router.post(
-    "/login",
-    response_model=schemas.LoginResponse,
-)
-def login(
-    payload: schemas.LoginRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Authenticate a user and return the complete frontend session.
-
-    The response includes:
-        - access_token
-        - token_type
-        - role
-        - username
-        - full_name
-        - taluk_id
-        - taluk_name
-    """
-
-    # --------------------------------------------------------
-    # FIND USER
-    # --------------------------------------------------------
-
-    user = (
-        db.query(models.User)
-        .filter(
-            models.User.username == payload.username
-        )
-        .first()
+cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not cred_path:
+    raise RuntimeError(
+        "GOOGLE_APPLICATION_CREDENTIALS env var is required to initialize Firebase Admin SDK"
     )
+initialize_app(credentials.Certificate(cred_path))
 
-    # --------------------------------------------------------
-    # VALIDATE CREDENTIALS
-    # --------------------------------------------------------
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+router = APIRouter()
+
+
+def get_firebase_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> User:
+    """Return a local User from an ID token.
+
+    The token is verified by Firebase Admin and the ``sub`` claim is used to
+    locate the matching user in the ``users`` table via the ``firebase_uid``
+    column.
+    """
+    try:
+        decoded = firebase_auth.verify_id_token(token)
+    except ExpiredIdTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired, please sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+    except (InvalidIdTokenError, RevokedIdTokenError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Firebase token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    uid = decoded.get("sub") or decoded.get("uid")
+    if not uid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: no user id",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.query(User).filter(User.firebase_uid == uid).first()
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in local database",
         )
 
-    if not auth.verify_password(
-        payload.password,
-        user.password_hash,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
-
-    # --------------------------------------------------------
-    # CHECK ACTIVE ACCOUNT
-    # --------------------------------------------------------
-
-    if not bool(user.is_active):
+    if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "This account is inactive. "
-                "Please contact an administrator."
-            ),
+            detail="Your account has been deactivated",
         )
 
-    # --------------------------------------------------------
-    # VALIDATE ROLE
-    # --------------------------------------------------------
+    return user
 
-    if user.role != payload.role:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"This account is registered as "
-                f"'{user.role}', not '{payload.role}'."
-            ),
-        )
 
-    # --------------------------------------------------------
-    # CREATE JWT
-    # --------------------------------------------------------
-
-    token = auth.create_access_token(
-        {
-            "sub": user.username,
-            "role": user.role,
-        }
-    )
-
-    # --------------------------------------------------------
-    # DEFAULT LOCATION VALUES
-    # --------------------------------------------------------
-
-    taluk_id = None
-    taluk_name = None
-
-    # --------------------------------------------------------
-    # AGENT-SPECIFIC LOCATION
-    # --------------------------------------------------------
-
-    if user.role == "agent":
-
-        agent = (
-            db.query(models.Agent)
-            .filter(
-                models.Agent.user_id == user.id
+def require_role(required_role: str):
+    def role_dependency(current_user: User = Depends(get_firebase_user)):
+        if current_user.role != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions",
             )
-            .first()
-        )
+        return current_user
+    return role_dependency
 
-        if agent:
 
-            taluk_id = agent.taluk_id
+@router.post("/login", summary="Login via Firebase Auth")
+async def login():
+    return {
+        "message": "Login handled on the client; send ID token on subsequent requests"
+    }
 
-            if agent.taluk:
-                taluk_name = agent.taluk.name
-
-    # --------------------------------------------------------
-    # MEDICAL SUPERVISOR
-    #
-    # Medical supervisors do not use Agent.taluk.
-    # Their district assignment is handled separately.
-    # --------------------------------------------------------
-
-    # No agent lookup is performed for:
-    #     medical_supervisor
-    #     admin
-
-    # --------------------------------------------------------
-    # RETURN COMPLETE LOGIN SESSION
-    # --------------------------------------------------------
-
-    return schemas.LoginResponse(
-
-        # Authentication
-        access_token=token,
-
-        # IMPORTANT:
-        # This is the field required by the User Portal
-        # Medical Assistant header.
-        token_type="bearer",
-
-        # User identity
-        username=user.username,
-        role=user.role,
-        full_name=user.full_name,
-
-        # Location information
-        taluk_id=taluk_id,
-        taluk_name=taluk_name,
-    )
+@router.get("/me", summary="Get current authenticated user's profile")
+async def get_me(current_user: User = Depends(get_firebase_user)):
+    return {
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+        "supervisor_district_id": current_user.supervisor_district_id,
+    }
+    
+__all__ = ["router", "get_firebase_user", "require_role"]

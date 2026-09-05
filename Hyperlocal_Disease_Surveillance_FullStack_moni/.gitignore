@@ -88,5 +88,8 @@ Thumbs.db
 /backend/venv/
 
 # Python cache files
-__pycache__/
+/backend/app/__pycache__
 *.py[cod]
+
+# Firebase / Google Cloud credentials
+backend/*firebase-adminsdk*.json

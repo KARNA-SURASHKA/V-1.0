@@ -51,7 +51,14 @@ class User(Base):
 
     password_hash = Column(
         String,
-        nullable=False,
+        nullable=True,
+    )
+    
+    firebase_uid = Column(
+    String,
+    unique=True,
+    index=True,
+    nullable=True,  # not required for existing rows
     )
 
     full_name = Column(

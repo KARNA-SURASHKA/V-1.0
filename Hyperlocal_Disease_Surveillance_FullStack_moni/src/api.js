@@ -177,6 +177,7 @@ const request = async (
     body = undefined,
     params = undefined,
     auth = true,
+    token: tokenOverride = undefined,
   } = options;
 
   const url = buildUrl(endpoint, params);
@@ -207,7 +208,7 @@ const request = async (
   // ----------------------------------------------------------
 
   if (auth) {
-    const token = getToken();
+    const token = tokenOverride || getToken();
 
     if (token) {
       headers.Authorization = `Bearer ${token}`;
@@ -217,8 +218,8 @@ const request = async (
   console.log(
     `[API REQUEST] ${method} ${url}`,
     {
-      authenticated: auth && Boolean(getToken()),
-      hasToken: Boolean(getToken()),
+      authenticated: auth && Boolean(tokenOverride || getToken()),
+      hasToken: Boolean(tokenOverride || getToken()),
     }
   );
 
